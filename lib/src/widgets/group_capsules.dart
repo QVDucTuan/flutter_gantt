@@ -61,7 +61,7 @@ class GanttGroupCapsules extends StatelessWidget {
         final decoration =
             theme.groupCapsuleStyle != null
                 ? theme.groupCapsuleStyle!(activity, depth)
-                : _defaultCapsuleStyle(theme, depth);
+                : _defaultCapsuleStyle(theme, activity, depth);
         if (decoration != null) {
           double? top;
           double? bottom;
@@ -153,16 +153,30 @@ class GanttGroupCapsules extends StatelessWidget {
 double _verticalPaddingForDepth(GanttTheme theme, int depth) =>
     theme.groupCapsuleVerticalPadding / (depth + 1);
 
-BoxDecoration _defaultCapsuleStyle(GanttTheme theme, int depth) =>
-    BoxDecoration(
-      border: Border.all(
-        color: theme.treeGuideColor.withValues(alpha: 0.5),
-        width: 1,
-      ),
-      borderRadius: BorderRadius.circular(depth == 0 ? 8 : 12),
-      color:
-          depth == 0 ? null : theme.defaultCellColor.withValues(alpha: 0.08),
-    );
+BoxDecoration _defaultCapsuleStyle(
+  GanttTheme theme,
+  GanttActivity activity,
+  int depth,
+) {
+  // Wash tinted with this activity's own bar color (the same one
+  // GanttCell resolves), not an unrelated fixed color — so the capsule
+  // reads as "this activity's own group," matching QV's own washes.
+  final barColor =
+      theme.colorResolver?.call(depth, activity.colorIndex, activity.color) ??
+      activity.color ??
+      theme.defaultCellColor;
+  return BoxDecoration(
+    border: Border.all(
+      // Bolder than a 50%-alpha hairline would be — this border is what
+      // makes the group visually readable as "one thing", so it needs to
+      // stand out more than a background/grid line does.
+      color: theme.treeGuideColor.withValues(alpha: 0.9),
+      width: 1.5,
+    ),
+    borderRadius: BorderRadius.circular(depth == 0 ? 8 : 12),
+    color: depth == 0 ? null : barColor.withValues(alpha: 0.12),
+  );
+}
 
 class _CapsuleSpec {
   final double left;

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../utils/datetime.dart';
 
+/// Sentinel distinguishing "field not passed to [GanttActivity.copyWith]"
+/// from "explicitly passed `null`" for its nullable parameters.
+const Object _unset = Object();
+
 /// An action that can be performed on a Gantt activity.
 class GanttActivityAction {
   /// The icon representing the action.
@@ -88,13 +92,42 @@ class GanttActivity<T> {
   /// [GanttController.fixedDayWidth]).
   final List<String>? dependsOn;
 
-  /// Whether to show the activity cell.
+  /// Whether to render a date-bound bar for this activity at all.
+  ///
+  /// Set to `false` to make an activity render as a plain row instead of a
+  /// bar — e.g. a checklist-style "subitem" that has dates (for dependency
+  /// arrows/group capsules) but isn't itself a scheduled span. Pair this
+  /// with [titleWidget] to supply the row's content (a checkbox + name, for
+  /// example) — see `example/lib/main.dart`'s `SubitemChecklistTitle` for a
+  /// complete pattern. Structurally disables dragging/resizing, not just
+  /// the visual — `GanttActivityRow` never mounts a drag gesture for it.
   final bool showCell;
 
   /// Builder function for custom cell rendering.
   final Widget Function(GanttActivity activity)? builder;
 
-  /// Optional custom data associated with the activity.
+  /// A place to attach whatever business data this activity represents —
+  /// status, priority, assignee, a link back to your own domain model,
+  /// anything. The package never reads this itself; it only exists so your
+  /// own [GanttListColumn.cellBuilder]s (or `builder`/`cellBuilder` above)
+  /// can read it back via `activity.data`. A minimal example:
+  ///
+  /// ```dart
+  /// typedef TaskMeta = ({TaskStatus status, User assignee});
+  ///
+  /// GanttActivity(
+  ///   ...,
+  ///   data: (status: TaskStatus.inProgress, assignee: someUser),
+  /// )
+  ///
+  /// GanttListColumn(
+  ///   header: 'Status',
+  ///   cellBuilder: (context, activity) {
+  ///     final meta = activity.data as TaskMeta?;
+  ///     return meta == null ? const SizedBox.shrink() : StatusGlyph(meta.status);
+  ///   },
+  /// )
+  /// ```
   final T? data;
 
   GanttActivity? _parent;
@@ -183,6 +216,98 @@ class GanttActivity<T> {
       }
     }
   }
+
+  /// Returns a copy of this activity with the given fields replaced.
+  ///
+  /// [children] and [data] are the two fields you'll reach for most: since
+  /// both are `final`, editing a tree (adding/removing a child, marking an
+  /// activity's `data` complete, etc.) means rebuilding the affected
+  /// activity — and every ancestor up to whatever you hand to
+  /// [GanttController.setActivities], since each one holds its own `final
+  /// children` list. This only rebuilds the one activity you call it on.
+  ///
+  /// Every nullable field can be explicitly cleared by passing `null` — it
+  /// isn't confused with "leave unchanged" (which is what omitting the
+  /// parameter does), the same distinction `copyWith` methods generally
+  /// make in Dart. [key]/[start]/[end] are non-nullable, so there's nothing
+  /// to clear for those — omitting them just keeps the current value.
+  ///
+  /// ```dart
+  /// // Append a new Subitem to a Subtask's children:
+  /// final updatedSubtask = subtask.copyWith(
+  ///   children: [...?subtask.children, newSubitem],
+  /// );
+  /// // ...then rebuild subtask's own parent the same way, up to the root,
+  /// // and call controller.setActivities(newTopLevelList).
+  /// ```
+  GanttActivity<T> copyWith({
+    String? key,
+    DateTime? start,
+    DateTime? end,
+    Object? title = _unset,
+    Object? titleWidget = _unset,
+    Object? listTitle = _unset,
+    Object? listTitleWidget = _unset,
+    Object? tooltip = _unset,
+    Object? iconTitle = _unset,
+    Object? children = _unset,
+    Object? onCellTap = _unset,
+    Object? cellBuilder = _unset,
+    Object? color = _unset,
+    Object? progress = _unset,
+    Object? colorIndex = _unset,
+    Object? dependsOn = _unset,
+    Object? actions = _unset,
+    bool? showCell,
+    Object? builder = _unset,
+    Object? data = _unset,
+    Object? limitStart = _unset,
+    Object? limitEnd = _unset,
+  }) => GanttActivity<T>(
+    key: key ?? this.key,
+    start: start ?? this.start,
+    end: end ?? this.end,
+    title: title == _unset ? this.title : title as String?,
+    titleWidget:
+        titleWidget == _unset ? this.titleWidget : titleWidget as Widget?,
+    listTitle: listTitle == _unset ? this.listTitle : listTitle as String?,
+    listTitleWidget:
+        listTitleWidget == _unset
+            ? this.listTitleWidget
+            : listTitleWidget as Widget?,
+    tooltip: tooltip == _unset ? this.tooltip : tooltip as String?,
+    iconTitle: iconTitle == _unset ? this.iconTitle : iconTitle as Widget?,
+    children:
+        children == _unset
+            ? this.children
+            : children as List<GanttActivity>?,
+    onCellTap:
+        onCellTap == _unset
+            ? this.onCellTap
+            : onCellTap as Function(GanttActivity activity)?,
+    cellBuilder:
+        cellBuilder == _unset
+            ? this.cellBuilder
+            : cellBuilder as Widget Function(DateTime)?,
+    color: color == _unset ? this.color : color as Color?,
+    progress: progress == _unset ? this.progress : progress as double?,
+    colorIndex: colorIndex == _unset ? this.colorIndex : colorIndex as int?,
+    dependsOn:
+        dependsOn == _unset ? this.dependsOn : dependsOn as List<String>?,
+    actions:
+        actions == _unset
+            ? this.actions
+            : actions as List<GanttActivityAction>?,
+    showCell: showCell ?? this.showCell,
+    builder:
+        builder == _unset
+            ? this.builder
+            : builder as Widget Function(GanttActivity)?,
+    data: data == _unset ? this.data : data as T?,
+    limitStart:
+        limitStart == _unset ? this.limitStart : limitStart as DateTime?,
+    limitEnd: limitEnd == _unset ? this.limitEnd : limitEnd as DateTime?,
+  );
 
   /// The duration of the activity in days.
   int get daysDuration => end.diffInDays(start) + 1;

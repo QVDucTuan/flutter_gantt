@@ -26,6 +26,7 @@ enum GanttInteractionMode {
 /// user interactions like date range changes and activity modifications.
 class GanttController extends ChangeNotifier {
   DateTime _startDate;
+  DateTime? _minEndDate;
   List<GanttActivity> _activities = [];
   List<GantDateHoliday> _holidays = [];
   List<GanttMarker> _markers = [];
@@ -76,6 +77,23 @@ class GanttController extends ChangeNotifier {
     value = value.toDate;
     if (value != _startDate) {
       _startDate = value;
+      notifyListeners();
+    }
+  }
+
+  /// In scroll mode, the date the visible range is guaranteed to extend
+  /// through even if no activity or holiday reaches that far — the canvas
+  /// still grows further when one does (see [GanttController.internalDaysViews]).
+  /// Defaults to 30 days after today. Grows automatically as a bar is
+  /// dragged past it (see [onActivityChanged]) but never shrinks on its
+  /// own; set explicitly to pull it back in.
+  DateTime? get minEndDate => _minEndDate;
+
+  /// Sets [minEndDate] and notifies listeners if changed.
+  set minEndDate(DateTime? value) {
+    value = value?.toDate;
+    if (value != _minEndDate) {
+      _minEndDate = value;
       notifyListeners();
     }
   }
@@ -321,15 +339,21 @@ class GanttController extends ChangeNotifier {
 
   /// Creates a [GanttController] with optional start date.
   ///
-  /// If no [startDate] is provided, defaults to 30 days before today.
+  /// If no [startDate] is provided, defaults to 30 days before today; if no
+  /// [minEndDate] is provided, defaults to 30 days after today — so the
+  /// chart shows a full ±30-day window around today out of the box.
   GanttController({
     DateTime? startDate,
+    DateTime? minEndDate,
     int? daysViews,
     Duration dragStartDelay = kLongPressTimeout,
     GanttTheme? theme,
   }) : _startDate =
            (startDate?.toDate ??
                DateTime.now().toDate.subtract(Duration(days: 30))),
+       _minEndDate =
+           minEndDate?.toDate ??
+           DateTime.now().toDate.add(const Duration(days: 30)),
        _daysViews = daysViews,
        _dragStartDelay = dragStartDelay,
        _theme = theme ?? GanttTheme();

@@ -95,6 +95,11 @@ class _SelectableBarGestureState extends State<SelectableBarGesture> {
     final ctrl = widget.ctrl;
     final activity = widget.activity;
     final daysDeltaTemp = (dx / ctrl.dayColumnWidth).round();
+    // Deliberately NOT bounded to the currently rendered date range — a
+    // task near the edge of the visible window must still be draggable
+    // earlier/later than what happens to be on screen right now. build()
+    // below clamps the resulting pixel widths instead, so going past the
+    // rendered edge just clips visually rather than crashing.
     final valid = switch (_mode!) {
       _DragMode.move =>
         activity.validMove(daysDeltaTemp) ||
@@ -328,7 +333,13 @@ class _SelectableBarGestureState extends State<SelectableBarGesture> {
     return Row(
       children: [
         SizedBox(
-          width: ctrl.spaceBefore + startOffset + moveOffset,
+          // Clamped, not the delta itself — dragging past the rendered
+          // edge keeps tracking the pointer and still commits the real
+          // date on release, it just can't draw further left than 0.
+          width: (ctrl.spaceBefore + startOffset + moveOffset).clamp(
+            0.0,
+            double.infinity,
+          ),
           child: const SizedBox(),
         ),
         SizedBox(

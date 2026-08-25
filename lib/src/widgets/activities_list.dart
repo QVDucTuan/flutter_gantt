@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -29,6 +30,9 @@ class ActivitiesList extends StatefulWidget {
     this.showIsoWeek = false,
     this.showTreeGuides = false,
     this.columns,
+    this.onActivitySecondaryTap,
+    this.initialColumnWidths,
+    this.onColumnWidthsChanged,
   });
 
   /// Whether to show the ISO week number row.
@@ -56,6 +60,35 @@ class ActivitiesList extends StatefulWidget {
   /// and every row resize together.
   final List<GanttListColumn>? columns;
 
+  /// Called when a row is right-clicked (or, on a trackpad, secondary-
+  /// tapped) — with the activity under the pointer and the pointer's
+  /// global position. The package has no concept of a context menu itself;
+  /// this just reports "here's the activity, here's where to anchor
+  /// whatever menu you build" (e.g. via `showMenu`), since what the menu
+  /// contains is entirely business logic (different items depending on
+  /// whether the activity is a top-level Task, a Subtask, or a leaf — that
+  /// classification is left/right, not the package's).
+  final void Function(GanttActivity activity, Offset globalPosition)?
+  onActivitySecondaryTap;
+
+  /// Restores column widths from a previous session — one ratio per
+  /// [columns] entry (each `0.0`–`1.0`, only meaningful summed across the
+  /// flex-based columns; an entry for a fixed-`width` column is ignored).
+  /// Must match [columns] in length to take effect; a length mismatch (e.g.
+  /// a column was added/removed since these were saved) falls back to
+  /// resolving widths from [GanttListColumn.flex]/[GanttListColumn.width]
+  /// as usual. The package doesn't persist this itself — pair with
+  /// [onColumnWidthsChanged] and your own storage (`SharedPreferences`, a
+  /// user-settings API, ...).
+  final List<double>? initialColumnWidths;
+
+  /// Called once a column-boundary drag finishes (on release, not on every
+  /// pointer move mid-drag) with every column's current width ratio, in
+  /// [columns] order — suitable for handing straight to your own storage
+  /// and feeding back in as [initialColumnWidths] next time. `null` (the
+  /// default) does nothing; the package itself never persists this.
+  final void Function(List<double> ratios)? onColumnWidthsChanged;
+
   @override
   State<ActivitiesList> createState() => _ActivitiesListState();
 }
@@ -63,54 +96,102 @@ class ActivitiesList extends StatefulWidget {
 class _ActivitiesListState extends State<ActivitiesList> {
   static const double _minColumnWidth = 40.0;
   static const double _dividerWidth = 1.0;
+  // Short centered tick, not a wall-to-wall divider — each data row draws
+  // its own, matching QV's per-row style instead of one continuous line.
+  static const double _columnDividerTickHeight = 20.0;
 
-  List<double>? _columnWidths;
+  /// Each flex-based column's share of the *flexible* space (total width
+  /// minus any fixed-`width` columns and the dividers between them) — always
+  /// sums to 1.0 across the flex columns. Re-resolved into actual pixels on
+  /// every build from whatever the current available width is (see
+  /// [_resolveWidths]), so the ratio — not a stale pixel count — is what's
+  /// preserved across window resizes or a column being added/removed. A
+  /// fixed-`width` column has no entry here; it always renders at its own
+  /// literal width regardless of available space.
+  List<double>? _columnRatios;
 
-  void _ensureColumnWidths(List<GanttListColumn> columns, double totalWidth) {
-    if (_columnWidths != null && _columnWidths!.length == columns.length) {
+  void _ensureColumnRatios(List<GanttListColumn> columns) {
+    if (_columnRatios != null && _columnRatios!.length == columns.length) {
       return;
     }
-    final fixedTotal = columns.fold<double>(
-      0,
-      (sum, c) => sum + (c.width ?? 0),
-    );
+    final restored = widget.initialColumnWidths;
+    if (restored != null && restored.length == columns.length) {
+      _columnRatios = List.of(restored);
+      return;
+    }
     final flexTotal = columns.fold<double>(
       0,
       (sum, c) => sum + (c.width == null ? (c.flex ?? 1) : 0),
     );
+    _columnRatios = [
+      for (final c in columns)
+        c.width != null
+            ? 0.0
+            : (flexTotal > 0 ? (c.flex ?? 1) / flexTotal : 1 / columns.length),
+    ];
+  }
+
+  /// The flexible space actual columns compete over: [totalWidth] minus
+  /// every fixed-`width` column and every divider between columns.
+  double _flexSpace(List<GanttListColumn> columns, double totalWidth) {
+    final fixedTotal = columns.fold<double>(
+      0,
+      (sum, c) => sum + (c.width ?? 0),
+    );
     final dividersWidth = (columns.length - 1) * _dividerWidth;
-    final flexSpace = (totalWidth - fixedTotal - dividersWidth).clamp(
+    return (totalWidth - fixedTotal - dividersWidth).clamp(
       0.0,
       double.infinity,
     );
-    _columnWidths = [
-      for (final c in columns)
-        c.width ??
-            (flexTotal > 0
-                ? flexSpace * (c.flex ?? 1) / flexTotal
-                : flexSpace / columns.length),
+  }
+
+  /// Resolves each column's actual pixel width for the current build, from
+  /// its stored ratio (or its own fixed `width`) and [totalWidth].
+  List<double> _resolveWidths(List<GanttListColumn> columns, double totalWidth) {
+    final flexSpace = _flexSpace(columns, totalWidth);
+    final ratios = _columnRatios!;
+    return [
+      for (var i = 0; i < columns.length; i++)
+        columns[i].width ?? (flexSpace * ratios[i]),
     ];
   }
 
   /// Drags width between column [index] and the column right after it, so
   /// resizing one column always borrows/gives space to its neighbor instead
-  /// of changing the row's total width.
-  void _resizeBoundary(int index, double dx) {
-    final widths = _columnWidths;
-    if (widths == null) return;
+  /// of changing the row's total width. [flexSpace] is this build's current
+  /// flexible space (see [_flexSpace]) — needed to convert the drag's pixel
+  /// delta into a ratio delta, and to convert [_minColumnWidth] into an
+  /// equivalent minimum ratio.
+  void _resizeBoundary(int index, double dx, double flexSpace) {
+    final ratios = _columnRatios;
+    if (ratios == null || flexSpace <= 0) return;
     final next = index + 1;
-    if (next >= widths.length) return;
-    final newCurrent = (widths[index] + dx).clamp(
-      _minColumnWidth,
-      double.infinity,
-    );
-    final actualDelta = newCurrent - widths[index];
-    final newNext = widths[next] - actualDelta;
-    if (newNext < _minColumnWidth) return;
+    if (next >= ratios.length) return;
+    // Fixed-width columns don't have a meaningful ratio to drag.
+    if (widget.columns![index].width != null ||
+        widget.columns![next].width != null) {
+      return;
+    }
+    final minRatio = _minColumnWidth / flexSpace;
+    final ratioDelta = dx / flexSpace;
+    final newCurrent = (ratios[index] + ratioDelta).clamp(minRatio, 1.0);
+    final actualDelta = newCurrent - ratios[index];
+    final newNext = ratios[next] - actualDelta;
+    if (newNext < minRatio) return;
     setState(() {
-      widths[index] = newCurrent;
-      widths[next] = newNext;
+      ratios[index] = newCurrent;
+      ratios[next] = newNext;
     });
+  }
+
+  /// Reports the final ratios once a resize drag ends (see
+  /// [ActivitiesList.onColumnWidthsChanged]) — not on every pointer move
+  /// mid-drag, so a consumer persisting this doesn't write on every pixel.
+  void _notifyColumnWidthsChanged() {
+    final ratios = _columnRatios;
+    if (ratios != null) {
+      widget.onColumnWidthsChanged?.call(List.unmodifiable(ratios));
+    }
   }
 
   /// Recursively builds widgets for activities and their children.
@@ -118,7 +199,8 @@ class _ActivitiesListState extends State<ActivitiesList> {
     BuildContext context,
     List<GanttActivity> activities,
     GanttTheme theme,
-    GanttController controller, {
+    GanttController controller,
+    List<double>? widths, {
     int nested = 0,
   }) => List.generate(
     activities.length,
@@ -138,9 +220,15 @@ class _ActivitiesListState extends State<ActivitiesList> {
             height: theme.cellHeight,
             child: _ActivityRowInteraction(
               activity: activities[index],
+              onSecondaryTap: widget.onActivitySecondaryTap,
               child:
-                  widget.columns != null
-                      ? _buildColumnsRow(context, activities[index], controller)
+                  widths != null
+                      ? _buildColumnsRow(
+                        context,
+                        activities[index],
+                        controller,
+                        widths,
+                      )
                       : _buildNameRow(theme, activities[index], controller),
             ),
           ),
@@ -151,6 +239,7 @@ class _ActivitiesListState extends State<ActivitiesList> {
               activities[index].children!,
               theme,
               controller,
+              widths,
               nested: nested + 1,
             ),
         ],
@@ -272,10 +361,10 @@ class _ActivitiesListState extends State<ActivitiesList> {
     BuildContext context,
     GanttActivity activity,
     GanttController controller,
+    List<double> widths,
   ) {
     final theme = context.watch<GanttTheme>();
     final columns = widget.columns!;
-    final widths = _columnWidths!;
     return Row(
       children: [
         for (var i = 0; i < columns.length; i++) ...[
@@ -284,19 +373,29 @@ class _ActivitiesListState extends State<ActivitiesList> {
             child: _columnContent(context, theme, controller, activity, i),
           ),
           if (i < columns.length - 1)
-            Container(
-              width: _dividerWidth,
-              height: double.infinity,
-              color: theme.dividerColor,
+            Center(
+              child: Container(
+                width: _dividerWidth,
+                // A short tick centered on the row, not a wall-to-wall
+                // line — every row draws its own, so consecutive rows read
+                // as one continuous rail when they're flush, but a gap
+                // between rows (a group boundary, say) breaks it exactly
+                // there instead of a single line cutting across the gap.
+                height: _columnDividerTickHeight,
+                color: theme.dividerColor,
+              ),
             ),
         ],
       ],
     );
   }
 
-  Widget _buildHeaderRow(GanttTheme theme) {
+  Widget _buildHeaderRow(
+    GanttTheme theme,
+    List<double> widths,
+    double flexSpace,
+  ) {
     final columns = widget.columns!;
-    final widths = _columnWidths!;
     final cells = <Widget>[];
     final handles = <Widget>[];
     var x = 0.0;
@@ -317,10 +416,12 @@ class _ActivitiesListState extends State<ActivitiesList> {
       x += widths[i];
       if (i < columns.length - 1) {
         cells.add(
-          Container(
-            width: _dividerWidth,
-            height: double.infinity,
-            color: theme.dividerColor,
+          Center(
+            child: Container(
+              width: _dividerWidth,
+              height: _columnDividerTickHeight,
+              color: theme.dividerColor,
+            ),
           ),
         );
         // A wider invisible hit area floats on top of the divider (not part
@@ -335,7 +436,8 @@ class _ActivitiesListState extends State<ActivitiesList> {
             bottom: 0,
             width: 8,
             child: _ColumnResizeHandle(
-              onDrag: (dx) => _resizeBoundary(boundaryIndex, dx),
+              onDrag: (dx) => _resizeBoundary(boundaryIndex, dx, flexSpace),
+              onDragEnd: _notifyColumnWidthsChanged,
             ),
           ),
         );
@@ -360,14 +462,21 @@ class _ActivitiesListState extends State<ActivitiesList> {
       return LayoutBuilder(
         builder: (context, constraints) {
           final columns = widget.columns;
+          List<double>? widths;
+          double flexSpace = 0;
           if (columns != null) {
-            _ensureColumnWidths(columns, constraints.maxWidth);
+            _ensureColumnRatios(columns);
+            widths = _resolveWidths(columns, constraints.maxWidth);
+            flexSpace = _flexSpace(columns, constraints.maxWidth);
           }
           return Column(
             children: [
               SizedBox(
                 height: theme.headerHeight + (widget.showIsoWeek ? 10 : 0),
-                child: columns != null ? _buildHeaderRow(theme) : null,
+                child:
+                    widths != null
+                        ? _buildHeaderRow(theme, widths, flexSpace)
+                        : null,
               ),
               if (columns != null)
                 Container(height: 1, color: theme.dividerColor),
@@ -388,6 +497,7 @@ class _ActivitiesListState extends State<ActivitiesList> {
                         widget.activities,
                         theme,
                         ganttController,
+                        widths,
                       ),
                     ),
                   ],
@@ -406,9 +516,13 @@ class _ActivitiesListState extends State<ActivitiesList> {
 /// mounted in the header row — hovering/dragging a column's own data cells
 /// never resizes anything.
 class _ColumnResizeHandle extends StatefulWidget {
-  const _ColumnResizeHandle({required this.onDrag});
+  const _ColumnResizeHandle({required this.onDrag, this.onDragEnd});
 
   final ValueChanged<double> onDrag;
+
+  /// Fired once on release, only if the pointer actually moved (so a plain
+  /// click on the handle without dragging doesn't fire it).
+  final VoidCallback? onDragEnd;
 
   @override
   State<_ColumnResizeHandle> createState() => _ColumnResizeHandleState();
@@ -416,22 +530,36 @@ class _ColumnResizeHandle extends StatefulWidget {
 
 class _ColumnResizeHandleState extends State<_ColumnResizeHandle> {
   double? _lastX;
+  bool _dragged = false;
 
   // Raw pointer events, not a drag GestureDetector — see
   // _ActivityRowInteraction's note on why a gesture-arena wait would feel
   // delayed here too (this handle also sits above a scrollable list).
-  void _onPointerDown(PointerDownEvent event) => _lastX = event.position.dx;
+  void _onPointerDown(PointerDownEvent event) {
+    _lastX = event.position.dx;
+    _dragged = false;
+  }
 
   void _onPointerMove(PointerMoveEvent event) {
     final last = _lastX;
     if (last == null) return;
     _lastX = event.position.dx;
+    _dragged = true;
     widget.onDrag(event.position.dx - last);
   }
 
-  void _onPointerUp(PointerUpEvent event) => _lastX = null;
+  void _onPointerUp(PointerUpEvent event) {
+    _lastX = null;
+    if (_dragged) {
+      _dragged = false;
+      widget.onDragEnd?.call();
+    }
+  }
 
-  void _onPointerCancel(PointerCancelEvent event) => _lastX = null;
+  void _onPointerCancel(PointerCancelEvent event) {
+    _lastX = null;
+    _dragged = false;
+  }
 
   @override
   Widget build(BuildContext context) => MouseRegion(
@@ -455,10 +583,16 @@ class _ColumnResizeHandleState extends State<_ColumnResizeHandle> {
 /// `GanttActivityRow`) then highlight, so it's clear which row is selected
 /// from either side.
 class _ActivityRowInteraction extends StatefulWidget {
-  const _ActivityRowInteraction({required this.activity, required this.child});
+  const _ActivityRowInteraction({
+    required this.activity,
+    required this.child,
+    this.onSecondaryTap,
+  });
 
   final GanttActivity activity;
   final Widget child;
+  final void Function(GanttActivity activity, Offset globalPosition)?
+  onSecondaryTap;
 
   @override
   State<_ActivityRowInteraction> createState() =>
@@ -476,6 +610,10 @@ class _ActivityRowInteractionState extends State<_ActivityRowInteraction> {
   // its own pan recognizer). Same fix already used for bar selection in
   // SelectableBarGesture.
   void _onPointerDown(PointerDownEvent event) {
+    if (event.buttons & kSecondaryMouseButton != 0) {
+      widget.onSecondaryTap?.call(widget.activity, event.position);
+      return;
+    }
     _pointerDownPosition = event.position;
   }
 

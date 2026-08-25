@@ -1,5 +1,7 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show BrowserContextMenu;
 import 'package:flutter_gantt/flutter_gantt.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +9,9 @@ import 'package:provider/provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    BrowserContextMenu.disableContextMenu();
+  }
   runApp(const MyApp());
 }
 
@@ -220,13 +225,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
     final now = DateTime.now();
 
-    // Scroll mode needs the canvas to start early enough to cover every demo
-    // activity (the earliest, "Older Task", starts 10 days ago) — a couple
-    // days of buffer, not a whole extra month of empty columns.
-    _scrollStartDate = now.subtract(const Duration(days: 12));
+    // Always show a full ±30-day window around today — matches
+    // GanttController's own defaults, spelled out explicitly here.
+    _scrollStartDate = now.subtract(const Duration(days: 30));
 
     controller = GanttController(
       startDate: _scrollStartDate,
+      minEndDate: now.add(const Duration(days: 30)),
       //daysViews: 10, // Optional: you can set the number of days to be displayed
     );
     // Scroll mode and selectable drag are both on by default already — the
@@ -537,24 +542,24 @@ class _MyHomePageState extends State<MyHomePage> {
                           context.watch<GanttTheme>(),
                         ),
                   ),
-                  GanttListColumn(
-                    header: 'Start',
-                    flex: 2,
-                    cellBuilder:
-                        (context, activity) => Text(
-                          _listDateFormat.format(activity.start),
-                          style: context.watch<GanttTheme>().textStyle(),
-                        ),
-                  ),
-                  GanttListColumn(
-                    header: 'End',
-                    flex: 2,
-                    cellBuilder:
-                        (context, activity) => Text(
-                          _listDateFormat.format(activity.end),
-                          style: context.watch<GanttTheme>().textStyle(),
-                        ),
-                  ),
+                  // GanttListColumn(
+                  //   header: 'Start',
+                  //   flex: 2,
+                  //   cellBuilder:
+                  //       (context, activity) => Text(
+                  //         _listDateFormat.format(activity.start),
+                  //         style: context.watch<GanttTheme>().textStyle(),
+                  //       ),
+                  // ),
+                  // GanttListColumn(
+                  //   header: 'End',
+                  //   flex: 2,
+                  //   cellBuilder:
+                  //       (context, activity) => Text(
+                  //         _listDateFormat.format(activity.end),
+                  //         style: context.watch<GanttTheme>().textStyle(),
+                  //       ),
+                  // ),
                   GanttListColumn(
                     header: 'Assignee',
                     flex: 3,
@@ -579,8 +584,9 @@ class _MyHomePageState extends State<MyHomePage> {
                   // ),
                 ],
                 // holidaysAsync: (startDate, endDate, holidays) async {},
-                activitiesListFlex: 4,
+                activitiesListFlex: 3,
                 gridAreaFlex: 4,
+                onColumnWidthsChanged: (ratios) => debugPrint('New ratios: $ratios'),
                 onActivityChanged: (activity, start, end) {
                   if (start != null && end != null) {
                     debugPrint('$activity was moved (Event on widget)');
@@ -590,6 +596,28 @@ class _MyHomePageState extends State<MyHomePage> {
                     );
                   } else if (end != null) {
                     debugPrint('$activity end was moved (Event on widget)');
+                  }
+                  // A whole-bar move (both dates shift, not a resize of
+                  // just one edge) on an activity with children carries
+                  // every descendant along by the same number of days —
+                  // otherwise dragging a Task leaves its Subtasks/Subitems
+                  // behind at their old dates. `activity.start` here is
+                  // still the *old* value (mutated below), so this has to
+                  // run before that assignment.
+                  //kéo cha - con bên trong move theo
+                  if (start != null && end != null) {
+                    final deltaDays = start.difference(activity.start).inDays;
+                    if (deltaDays != 0) {
+                      for (final descendant
+                          in activity.children?.plainList ?? const []) {
+                        descendant.start = descendant.start.add(
+                          Duration(days: deltaDays),
+                        );
+                        descendant.end = descendant.end.add(
+                          Duration(days: deltaDays),
+                        );
+                      }
+                    }
                   }
                   if (start != null) {
                     _activities.getFromKey(activity.key)!.start = start;

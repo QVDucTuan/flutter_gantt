@@ -382,7 +382,13 @@ class _GanttActivityRowState extends State<GanttActivityRow> {
       return Row(
         children: [
           SizedBox(
-            width: ctrl.spaceBefore + (_movementStartOffset ?? 0),
+            // Clamped, not the delta — dragging past the rendered edge
+            // keeps tracking the pointer (the commit on drag-end still
+            // uses the real, unclamped delta), it just can't draw past 0.
+            width: (ctrl.spaceBefore + (_movementStartOffset ?? 0)).clamp(
+              0.0,
+              double.infinity,
+            ),
             child: Container(),
           ),
           SizedBox(

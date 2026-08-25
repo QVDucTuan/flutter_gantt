@@ -125,6 +125,56 @@ GanttActivity(
 )
 ```
 
+#### Extending with your own data (status, priority, assignee, checklist rows...)
+
+`flutter_gantt` stays fully generic — it has no concept of a task's status, priority, or
+assignee. Two extension points let an app add those without forking the package; the package
+itself never reads either, it just carries them through to your own rendering code.
+
+**1. Attach your own data via `GanttActivity<T>.data`**
+
+```dart
+// Your own type — the package never inspects it. A record works fine, so
+// does a class.
+typedef TaskMeta = ({TaskStatus status, TaskPriority? priority, User assignee});
+
+GanttActivity(
+  key: 'task1',
+  start: DateTime.now(),
+  end: DateTime.now().add(const Duration(days: 5)),
+  title: 'Design review',
+  data: (status: TaskStatus.inProgress, priority: TaskPriority.high, assignee: currentUser),
+)
+```
+
+**2. Read it back in a `GanttListColumn.cellBuilder`**
+
+```dart
+Gantt(
+  listColumns: [
+    GanttListColumn(header: 'Task', flex: 3, cellBuilder: (context, a) => Text(a.title ?? '')),
+    GanttListColumn(
+      header: 'Status',
+      cellBuilder: (context, a) {
+        final meta = a.data as TaskMeta?;
+        return meta == null ? const SizedBox.shrink() : StatusGlyph(meta.status);
+      },
+    ),
+  ],
+)
+```
+
+Every `cellBuilder`/`builder` you supply receives the plain `GanttActivity` — casting
+`activity.data as YourType?` is how you get your fields back. The same `data` payload also
+drives per-activity styling if you want it to (e.g. a `colorResolver` that picks a bar color
+from `activity.data`).
+
+The same idea makes a "checklist row" work: set `showCell: false` on an activity and supply
+`titleWidget:` (a checkbox + name, say) instead of `title:` — the row keeps its dates (for
+dependency arrows/group capsules) but renders as plain content instead of a bar, and can't be
+dragged. See `example/lib/main.dart`'s `SubitemChecklistTitle`/`TaskMeta`/`User` for a
+complete, runnable version of both patterns.
+
 #### ISO Weeks
 
 ```dart

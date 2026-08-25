@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -16,27 +18,57 @@ import 'activity.dart';
 typedef GanttColorResolver =
     Color Function(int depth, int? colorIndex, Color? explicitColor);
 
-/// The package's built-in default [GanttColorResolver]: honors an
-/// activity's own explicit color when set, else falls back to a single
-/// green base tone — then lightens progressively by depth, so a whole
-/// activity family (an activity and its descendants) reads as one
-/// consistent hue instead of an arbitrary color per row.
-///
-/// This is a deliberate simplification of QV Agent Hub's own 100-hue,
-/// one-per-Task palette (see `04-domain-logic.md`'s `ganttBarColors`) —
-/// pass your own [GanttColorResolver] (or `null`) to `GanttTheme.colorResolver`
-/// to opt out.
+/// QV Agent Hub's own per-depth saturation/lightness table (see
+/// `04-domain-logic.md`'s `GANTT_BAR_TONE`), ported verbatim — depth 1
+/// (Subtask) is deliberately a touch *darker* than depth 0 (Task) in QV's
+/// own design, not lighter, since a Subtask reads as its own stack's
+/// "header"; depth 2 (Subitem) is the lightest of the three.
+const List<({double s, double l})> _ganttBarTones = [
+  (s: 0.62, l: 0.64), // depth 0 — Task
+  (s: 0.56, l: 0.62), // depth 1 — Subtask
+  (s: 0.58, l: 0.78), // depth 2 — Subitem
+];
+
+/// The hue QV Agent Hub's own `colorIndex` 0 preset resolves to (their
+/// `hueForIndex`, evaluated at index 0). This package simplifies their
+/// 100-hue rotating palette (one hue per Task) down to this single hue
+/// family, so every activity here reads as one consistent color instead of
+/// an arbitrary one per row — pass your own [GanttColorResolver] (or
+/// `null`) to `GanttTheme.colorResolver` to opt back into per-activity hues.
+const double _ganttBarHue = 95;
+
+/// The package's built-in default [GanttColorResolver]: QV Agent Hub's own
+/// tone table when an activity has no explicit color, or QV's own
+/// explicit-color lightening formula when it does — see `04-domain-logic.md`'s
+/// `ganttBarColors` (this is that function, minus its 100-hue rotation; see
+/// [_ganttBarHue]).
 Color defaultGanttColorResolver(
   int depth,
   int? colorIndex,
   Color? explicitColor,
 ) {
-  final base = explicitColor ?? const Color(0xFF55A76A);
-  if (depth <= 0) return base;
-  final hsl = HSLColor.fromColor(base);
-  return hsl
-      .withLightness((hsl.lightness + depth * 0.15).clamp(0.0, 0.92))
-      .toColor();
+  final clampedDepth = depth.clamp(0, _ganttBarTones.length - 1);
+  if (explicitColor == null) {
+    final tone = _ganttBarTones[clampedDepth];
+    return HSLColor.fromAHSL(1, _ganttBarHue, tone.s, tone.l).toColor();
+  }
+  if (depth <= 0) return explicitColor;
+  // A Subitem must always read visually lighter than its Subtask even when
+  // the user picked an arbitrary custom hex — QV's own formula for that.
+  final hsl = HSLColor.fromColor(explicitColor);
+  final subLightness = (hsl.lightness + 0.06).clamp(0.48, 0.72);
+  final itemLightness = (hsl.lightness + 0.22).clamp(subLightness + 0.12, 0.84);
+  final fillLightness = depth == 1 ? subLightness : itemLightness;
+  final fillSaturation = math.max(
+    0.22,
+    hsl.saturation * (depth == 1 ? 0.85 : 0.72),
+  );
+  return HSLColor.fromAHSL(
+    1,
+    hsl.hue,
+    fillSaturation,
+    fillLightness,
+  ).toColor();
 }
 
 /// Resolves the visual style of the background capsule wrapping an activity
@@ -89,7 +121,7 @@ class GanttTheme {
   final Color holidayColor;
 
   /// The color used to highlight weekend dates.
-  /// Defaults to [Color(0xFFF3F3F3)].
+  /// Defaults to [Color(0xFFF8F8F8)] (a faint tint, not a hard grey block).
   final Color weekendColor;
 
   /// The background color for today's date cell.
@@ -295,7 +327,7 @@ class GanttTheme {
   // Material default; override any of these per-instance as needed.
   static const Color _defaultBackgroundColor = Color(0xFFFCFCFC);
   static const Color _defaultHolidayColor = Color(0xFFFFF1E4);
-  static const Color _defaultWeekendColor = Color(0xFFF3F3F3);
+  static const Color _defaultWeekendColor = Color(0xFFF8F8F8);
   static const Color _defaultTodayBackgroundColor = Color(0xFF0D90D9);
   static const Color _defaultCellColor = Color(0xFF008ECB);
   static const Color _defaultTodayLineColor = Color(0xFF0D90D9);

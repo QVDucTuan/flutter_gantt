@@ -87,6 +87,7 @@ extension GanttCtrlInternal on GanttController {
     final dates = <DateTime>[
       ...activities.plainList.map((a) => a.end),
       ...holidays.map((h) => h.date),
+      if (minEndDate != null) minEndDate!,
     ];
     if (dates.isEmpty) return null;
     return DateTimeEx.lastDateFromList(dates);
@@ -160,6 +161,11 @@ extension GanttCtrlInternal on GanttController {
   }
 
   /// Notifies listeners when an activity's dates changes.
+  ///
+  /// Also keeps the visible range comfortably covering whatever was just
+  /// dragged: if the new [start]/[end] lands outside the currently shown
+  /// days, the range grows 5 extra days past it in the direction dragged,
+  /// so the bar doesn't end up flush against the canvas edge.
   void onActivityChanged(
     GanttActivity activity, {
     DateTime? start,
@@ -167,6 +173,15 @@ extension GanttCtrlInternal on GanttController {
   }) {
     for (var listener in onActivityChangedListeners) {
       listener(activity, start, end);
+    }
+    if (start != null && start.isBefore(startDate)) {
+      startDate = start.subtract(const Duration(days: 5));
+    }
+    if (end != null && end.isAfter(endDate)) {
+      final candidate = end.add(const Duration(days: 5));
+      if (minEndDate == null || candidate.isAfter(minEndDate!)) {
+        minEndDate = candidate;
+      }
     }
   }
 

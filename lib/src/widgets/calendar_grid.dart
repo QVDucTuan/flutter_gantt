@@ -111,7 +111,7 @@ class CalendarGrid extends StatelessWidget {
                             width: 1,
                             color:
                                 (i < months.length - 1)
-                                    ? Colors.grey
+                                    ? context.watch<GanttTheme>().dividerColor
                                     : Colors.transparent,
                             height: 10,
                           ),
@@ -151,7 +151,7 @@ class CalendarGrid extends StatelessWidget {
                               width: 1,
                               color:
                                   (i < weeks.length - 1)
-                                      ? Colors.grey
+                                      ? context.watch<GanttTheme>().dividerColor
                                       : Colors.transparent,
                               height: 10,
                             ),
@@ -270,7 +270,14 @@ class CalendarGrid extends StatelessWidget {
                           color:
                               c.dateToHighlight(day)
                                   ? context.watch<GanttTheme>().defaultCellColor
-                                  : Colors.grey,
+                                  // Fainter than the structural dividers
+                                  // (pane/header/frame) — this is a fine
+                                  // day-by-day grid line, not a section
+                                  // boundary, so it should recede more.
+                                  : context
+                                      .watch<GanttTheme>()
+                                      .dividerColor
+                                      .withValues(alpha: 0.4),
                         ),
                       ],
                     ),

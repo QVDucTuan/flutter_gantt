@@ -130,6 +130,49 @@ class Gantt extends StatefulWidget {
   /// mode (see [GanttController.fixedDayWidth]).
   final bool showGroupCapsules;
 
+  /// Called when an activities-list row is right-clicked (or, on a
+  /// trackpad, secondary-tapped) — with the activity and the pointer's
+  /// global position. `null` (the default) does nothing; there's no
+  /// built-in context menu, since what it should contain (e.g. different
+  /// items for a top-level Task vs. a leaf Subitem) is business logic the
+  /// package can't know. Typically you'd call Flutter's own `showMenu` at
+  /// [Offset] on tap:
+  ///
+  /// ```dart
+  /// Gantt(
+  ///   onActivitySecondaryTap: (activity, position) async {
+  ///     final selected = await showMenu<String>(
+  ///       context: context,
+  ///       position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx, position.dy),
+  ///       items: [/* your own items, chosen from activity.depth etc. */],
+  ///     );
+  ///     // handle `selected`
+  ///   },
+  /// )
+  /// ```
+  final void Function(GanttActivity activity, Offset globalPosition)?
+  onActivitySecondaryTap;
+
+  /// Restores [listColumns] widths from a previous session — one ratio per
+  /// column (each `0.0`–`1.0`, summed across the flex-based columns). Must
+  /// match [listColumns] in length to take effect. The package never
+  /// persists this itself; pair with [onColumnWidthsChanged] and your own
+  /// storage (`SharedPreferences`, a user-settings API, ...):
+  ///
+  /// ```dart
+  /// Gantt(
+  ///   listColumns: myColumns,
+  ///   initialColumnWidths: savedRatios, // read from storage at startup
+  ///   onColumnWidthsChanged: (ratios) => saveToStorage(ratios),
+  /// )
+  /// ```
+  final List<double>? initialColumnWidths;
+
+  /// Called once a [listColumns] boundary drag finishes (on release, not on
+  /// every pointer move mid-drag) with every column's current width ratio.
+  /// `null` (the default) does nothing.
+  final void Function(List<double> ratios)? onColumnWidthsChanged;
+
   /// The drag/resize interaction bars use.
   /// Defaults to [GanttInteractionMode.selectableDrag].
   final GanttInteractionMode interactionMode;
@@ -141,6 +184,18 @@ class Gantt extends StatefulWidget {
   /// conversion logic.
   /// If `null`, a fallback or built-in formatter may be used instead.
   final MonthToText? monthToText;
+
+  /// Whether the chart scrolls horizontally so today's column sits in the
+  /// middle of the viewport once it first lays out. Only applies in scroll
+  /// mode (see [GanttController.fixedDayWidth]). Defaults to `true`.
+  final bool centerOnToday;
+
+  /// Whether selecting an activity (clicking its row in the activities
+  /// list, or clicking its bar — both set
+  /// [GanttController.selectedActivityKey]) scrolls the chart horizontally
+  /// to center that activity's bar in the viewport. Only applies in scroll
+  /// mode. Defaults to `true`.
+  final bool centerOnSelection;
 
   /// Creates a [Gantt] chart widget.
   ///
@@ -169,9 +224,14 @@ class Gantt extends StatefulWidget {
     this.showIsoWeek = false,
     this.showTreeGuides = false,
     this.showGroupCapsules = false,
+    this.onActivitySecondaryTap,
+    this.initialColumnWidths,
+    this.onColumnWidthsChanged,
     this.listColumns,
     this.interactionMode = GanttInteractionMode.selectableDrag,
     this.monthToText,
+    this.centerOnToday = true,
+    this.centerOnSelection = true,
   }) : assert(
          (startDate != null || controller != null) &&
              ((activities == null) != (activitiesAsync == null)) &&
@@ -199,6 +259,9 @@ class _GanttState extends State<Gantt> {
   // _gridColumnsController and crash any code reading its offset mid-swap.
   final GlobalKey _activitiesGridKey = GlobalKey();
   bool _loading = false;
+  // Tracks the last key we already centered on, so a notifyListeners() fired
+  // for an unrelated change (e.g. mid-drag) doesn't re-trigger the scroll.
+  String? _lastCenteredSelectionKey;
 
   @override
   void initState() {
@@ -213,6 +276,7 @@ class _GanttState extends State<Gantt> {
     controller.theme = theme;
     controller.addFetchListener(_getAsync);
     controller.attachHorizontalScrollController(_horizontalController);
+    controller.addListener(_onControllerChangedForCentering);
     if (widget.onActivityChanged != null) {
       controller.addOnActivityChangedListener(widget.onActivityChanged!);
     }
@@ -236,11 +300,58 @@ class _GanttState extends State<Gantt> {
     controller.allowParentIndependentDateMovement =
         widget.allowParentIndependentDateMovement;
     controller.interactionMode = widget.interactionMode;
+    if (widget.centerOnToday) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _centerOnDate(DateTime.now(), animate: false);
+      });
+    }
+  }
+
+  // Fires on every controller change; only acts when selectedActivityKey
+  // actually changed, and only if the app opted into it.
+  void _onControllerChangedForCentering() {
+    if (!widget.centerOnSelection) return;
+    final key = controller.selectedActivityKey;
+    if (key == _lastCenteredSelectionKey) return;
+    _lastCenteredSelectionKey = key;
+    if (key == null) return;
+    final activity = controller.activities.getFromKey(key);
+    if (activity != null) _centerOnActivity(activity);
+  }
+
+  void _centerOnDate(DateTime date, {required bool animate}) {
+    final x = controller.xForDate(date) + controller.dayColumnWidth / 2;
+    _scrollHorizontalTo(x, animate: animate);
+  }
+
+  void _centerOnActivity(GanttActivity activity) {
+    final startX = controller.xForDate(activity.start);
+    final endX = controller.xForDate(activity.end) + controller.dayColumnWidth;
+    _scrollHorizontalTo((startX + endX) / 2, animate: true);
+  }
+
+  void _scrollHorizontalTo(double targetX, {required bool animate}) {
+    if (!controller.isScrollMode || !_horizontalController.hasClients) return;
+    final position = _horizontalController.position;
+    final target = (targetX - position.viewportDimension / 2).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (animate) {
+      _horizontalController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    } else {
+      _horizontalController.jumpTo(target);
+    }
   }
 
   @override
   void dispose() {
     controller.removeFetchListener(_getAsync);
+    controller.removeListener(_onControllerChangedForCentering);
     if (widget.onActivityChanged != null) {
       controller.removeOnActivityChangedListener(widget.onActivityChanged!);
     }
@@ -431,6 +542,9 @@ class _GanttState extends State<Gantt> {
                       showIsoWeek: widget.showIsoWeek,
                       showTreeGuides: widget.showTreeGuides,
                       columns: widget.listColumns,
+                      onActivitySecondaryTap: widget.onActivitySecondaryTap,
+                      initialColumnWidths: widget.initialColumnWidths,
+                      onColumnWidthsChanged: widget.onColumnWidthsChanged,
                     ),
                   ),
                   Container(width: 1, color: theme.dividerColor),
