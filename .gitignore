@@ -29,3 +29,7 @@ migrate_working_dir/
 .flutter-plugins
 .flutter-plugins-dependencies
 build/
+
+# Local-only — Claude Code config and reference docs, not part of the package.
+.claude/
+doc/timeline-flutter-port/
