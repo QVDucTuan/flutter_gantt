@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../flutter_gantt.dart';
+import '../utils/row_geometry.dart';
 
 /// Displays the activities grid portion of the Gantt chart.
 ///
@@ -42,20 +43,32 @@ class ActivitiesGrid extends StatelessWidget {
   /// [nested] - The current nesting level (used for indentation)
   List<Widget> getItems(
     List<GanttActivity> activities,
-    GanttTheme theme, {
+    GanttTheme theme,
+    GanttController controller, {
     int nested = 0,
   }) => List.generate(
     activities.length,
     (index) => Padding(
       padding: EdgeInsets.only(
-        top: theme.rowPadding + (nested == 0 ? theme.rowsGroupPadding : 0),
+        top: rowTopPadding(
+          theme,
+          nested,
+          previousSibling: index > 0 ? activities[index - 1] : null,
+          current: activities[index],
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           GanttActivityRow(activity: activities[index]),
-          if (activities[index].children?.isNotEmpty == true)
-            ...getItems(activities[index].children!, theme, nested: nested + 1),
+          if (activities[index].children?.isNotEmpty == true &&
+              !controller.isCollapsed(activities[index].key))
+            ...getItems(
+              activities[index].children!,
+              theme,
+              controller,
+              nested: nested + 1,
+            ),
         ],
       ),
     ),
@@ -63,15 +76,17 @@ class ActivitiesGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Consumer<GanttTheme>(
-    builder:
-        (context, theme, child) => Padding(
-          padding: EdgeInsets.only(
-            top: theme.headerHeight + (showIsoWeek ? 10 : 0),
-          ),
-          child: ListView(
-            controller: controller,
-            children: getItems(activities, theme),
-          ),
+    builder: (context, theme, child) {
+      final controller = context.watch<GanttController>();
+      return Padding(
+        padding: EdgeInsets.only(
+          top: theme.headerHeight + (showIsoWeek ? 10 : 0),
         ),
+        child: ListView(
+          controller: this.controller,
+          children: getItems(activities, theme, controller),
+        ),
+      );
+    },
   );
 }

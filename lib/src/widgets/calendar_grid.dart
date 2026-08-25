@@ -101,6 +101,9 @@ class CalendarGrid extends StatelessWidget {
                                 month.key,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
+                                style: context.watch<GanttTheme>().textStyle(
+                                  weight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
@@ -119,6 +122,7 @@ class CalendarGrid extends StatelessWidget {
                 );
               },
             ),
+            Container(height: 1, color: context.watch<GanttTheme>().dividerColor),
             // Week numbers row
             if (showIsoWeek)
               Builder(
@@ -137,6 +141,9 @@ class CalendarGrid extends StatelessWidget {
                                   'W${week.key}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
+                                  style: context.watch<GanttTheme>().textStyle(
+                                    size: 10,
+                                  ),
                                 ),
                               ),
                             ),
@@ -174,12 +181,13 @@ class CalendarGrid extends StatelessWidget {
                     ),
                     child: Text(
                       '${day.day}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: context.watch<GanttTheme>().textStyle(
+                        size: 10,
                         color:
                             day.isToday
                                 ? context.watch<GanttTheme>().todayTextColor
                                 : null,
-                        fontWeight:
+                        weight:
                             day.isToday ? FontWeight.bold : FontWeight.normal,
                       ),
                       maxLines: 2,
@@ -198,40 +206,61 @@ class CalendarGrid extends StatelessWidget {
                               day,
                             ),
                             height: double.infinity,
-                            child: Align(
-                              alignment: Alignment.topCenter,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 4.0,
-                                ),
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    holiday != null
-                                        ? Tooltip(
-                                          message: holiday,
-                                          child: child,
-                                        )
-                                        : child,
-                                    if (holiday != null)
-                                      Positioned(
-                                        top: -2,
-                                        right: -2,
-                                        child: Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Theme.of(
-                                                  context,
-                                                ).colorScheme.error,
-                                            shape: BoxShape.circle,
+                            child: Stack(
+                              children: [
+                                if (day.isToday &&
+                                    context.watch<GanttTheme>().todayLineColor !=
+                                        null)
+                                  Align(
+                                    alignment: Alignment.topCenter,
+                                    child: Container(
+                                      width:
+                                          context
+                                              .watch<GanttTheme>()
+                                              .todayLineWidth,
+                                      height: double.infinity,
+                                      color:
+                                          context
+                                              .watch<GanttTheme>()
+                                              .todayLineColor,
+                                    ),
+                                  ),
+                                Align(
+                                  alignment: Alignment.topCenter,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4.0,
+                                    ),
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        holiday != null
+                                            ? Tooltip(
+                                              message: holiday,
+                                              child: child,
+                                            )
+                                            : child,
+                                        if (holiday != null)
+                                          Positioned(
+                                            top: -2,
+                                            right: -2,
+                                            child: Container(
+                                              width: 8,
+                                              height: 8,
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    Theme.of(
+                                                      context,
+                                                    ).colorScheme.error,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                      ),
-                                  ],
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         ),

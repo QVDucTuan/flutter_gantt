@@ -8,6 +8,18 @@ import '../utils/datetime.dart';
 typedef GanttActivityOnChangedEvent =
     void Function(GanttActivity activity, DateTime? start, DateTime? end);
 
+/// The drag/resize interaction a [Gantt] chart's bars use.
+enum GanttInteractionMode {
+  /// Always-visible edge handles, whole-bar drag via long-press with a
+  /// ghost-feedback overlay.
+  longPressDrag,
+
+  /// Click a bar to select it (revealing resize handles) or deselect it;
+  /// drag the bar body or a handle to move/resize it live, with a floating
+  /// date tooltip. Desktop/pointer-oriented — the default.
+  selectableDrag,
+}
+
 /// Controls the state and behavior of a [Gantt] widget.
 ///
 /// This controller manages the timeline view, activities data, and handles
@@ -16,13 +28,23 @@ class GanttController extends ChangeNotifier {
   DateTime _startDate;
   List<GanttActivity> _activities = [];
   List<GantDateHoliday> _holidays = [];
+  List<GanttMarker> _markers = [];
   int? _daysViews;
   final List<GanttActivityOnChangedEvent> _onActivityChangedListeners = [];
   double gridWidth = 0;
   List<DateTime> _highlightedDates = [];
   bool _enableDraggable = true;
-  bool _allowParentIndependentDateMovement = false;
+  bool _allowParentIndependentDateMovement = true;
   Duration _dragStartDelay;
+  double? _fixedDayWidth = _defaultFixedDayWidth;
+  ScrollController? _horizontalScrollController;
+  GanttInteractionMode _interactionMode = GanttInteractionMode.selectableDrag;
+  String? _selectedActivityKey;
+  final Set<String> _collapsedKeys = {};
+
+  /// Scroll mode (see [fixedDayWidth]) is on by default, at this pixel
+  /// width per day.
+  static const double _defaultFixedDayWidth = 40.0;
 
   late GanttTheme _theme;
 
@@ -84,6 +106,19 @@ class GanttController extends ChangeNotifier {
     }
   }
 
+  /// The list of point-in-time markers in the Gantt chart.
+  List<GanttMarker> get markers => _markers;
+
+  /// Sets the markers list and optionally notifies listeners.
+  void setMarkers(List<GanttMarker> value, {bool notify = true}) {
+    if (value != _markers) {
+      _markers = value;
+      if (notify) {
+        notifyListeners();
+      }
+    }
+  }
+
   /// The list of highlighted dates in the Gantt chart.
   List<DateTime> get highlightedDates => _highlightedDates;
 
@@ -126,6 +161,59 @@ class GanttController extends ChangeNotifier {
     }
   }
 
+  /// The drag/resize interaction bars use.
+  /// Defaults to [GanttInteractionMode.longPressDrag] (unchanged behavior).
+  GanttInteractionMode get interactionMode => _interactionMode;
+
+  /// Sets [interactionMode] and notifies listeners if changed.
+  set interactionMode(GanttInteractionMode value) {
+    if (value != _interactionMode) {
+      _interactionMode = value;
+      notifyListeners();
+    }
+  }
+
+  /// The currently-selected activity's key, when
+  /// [interactionMode] is [GanttInteractionMode.selectableDrag].
+  /// `null` when nothing is selected. Only one activity can be selected at
+  /// a time.
+  String? get selectedActivityKey => _selectedActivityKey;
+
+  /// Sets [selectedActivityKey] and notifies listeners if changed.
+  set selectedActivityKey(String? value) {
+    if (value != _selectedActivityKey) {
+      _selectedActivityKey = value;
+      notifyListeners();
+    }
+  }
+
+  /// Whether [key] is currently collapsed (its children hidden in both the
+  /// activities list and the chart). `false` for any key never toggled.
+  bool isCollapsed(String key) => _collapsedKeys.contains(key);
+
+  /// Toggles whether [key] is collapsed and notifies listeners. Only
+  /// meaningful for an activity with children — collapsing a leaf has no
+  /// visible effect, since it has nothing to hide.
+  void toggleCollapsed(String key) {
+    if (!_collapsedKeys.add(key)) {
+      _collapsedKeys.remove(key);
+    }
+    notifyListeners();
+  }
+
+  /// Explicitly sets whether [key] is collapsed and notifies listeners if
+  /// that's a change.
+  void setCollapsed(String key, bool collapsed) {
+    final changed =
+        collapsed ? _collapsedKeys.add(key) : _collapsedKeys.remove(key);
+    if (changed) notifyListeners();
+  }
+
+  /// In [GanttInteractionMode.selectableDrag], the minimum pointer movement,
+  /// in pixels, before a press-and-move on a bar counts as a drag rather
+  /// than a click. Defaults to 4.0.
+  double dragActivationDistance = 4.0;
+
   /// The number of days currently visible in the chart, if null will be calculated automatically
   int? get daysViews => _daysViews;
 
@@ -137,22 +225,61 @@ class GanttController extends ChangeNotifier {
     }
   }
 
+  /// When set (scroll mode — on by default, at 40px/day), the chart uses
+  /// this fixed pixel width per day — instead of fitting exactly
+  /// [daysViews] days into the available width — and scrolls horizontally
+  /// for real rather than navigating by dragging to pan. Set to `null` to
+  /// opt back into the original fit-to-width/pan behavior.
+  double? get fixedDayWidth => _fixedDayWidth;
+
+  /// Sets [fixedDayWidth] and notifies listeners if changed.
+  set fixedDayWidth(double? value) {
+    if (value != _fixedDayWidth) {
+      _fixedDayWidth = value;
+      notifyListeners();
+    }
+  }
+
+  /// Whether the chart is in fixed-day-width scroll mode (see [fixedDayWidth]).
+  bool get isScrollMode => _fixedDayWidth != null;
+
+  /// Internal: wires up the [ScrollController] the chart's horizontal
+  /// scroll view uses in scroll mode, so [next]/[prev] can drive it. Not for
+  /// direct use by consumers.
+  void attachHorizontalScrollController(ScrollController? controller) {
+    _horizontalScrollController = controller;
+  }
+
   /// Moves the view forward by [days] and optionally fetches new data.
   ///
   /// [days] - Number of days to move forward (default: 1)
   /// [fetchData] - Whether to trigger data fetch (default: true)
   void next({int days = 1, bool fetchData = true}) =>
-      _addStartDate(days: -days, fetchData: fetchData);
+      _shift(days: days, fetchData: fetchData);
 
   /// Moves the view backward by [days] and optionally fetches new data.
   ///
   /// [days] - Number of days to move backward (default: 1)
   /// [fetchData] - Whether to trigger data fetch (default: true)
   void prev({int days = 1, bool fetchData = true}) =>
-      _addStartDate(days: days, fetchData: fetchData);
+      _shift(days: -days, fetchData: fetchData);
 
-  void _addStartDate({int days = 1, bool fetchData = true}) {
-    startDate = startDate.subtract(Duration(days: days));
+  void _shift({required int days, bool fetchData = true}) {
+    final scrollController = _horizontalScrollController;
+    if (isScrollMode && scrollController != null && scrollController.hasClients) {
+      final position = scrollController.position;
+      final target = (position.pixels + days * _fixedDayWidth!).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    } else {
+      startDate = startDate.add(Duration(days: days));
+    }
     if (fetchData) {
       fetch();
     }

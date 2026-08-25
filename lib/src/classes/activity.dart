@@ -68,6 +68,26 @@ class GanttActivity<T> {
   /// The color of the activity cell.
   final Color? color;
 
+  /// The completion progress of the activity, from `0.0` to `1.0`.
+  ///
+  /// When set, [GanttCell] renders a progress-fill overlay covering this
+  /// fraction of the bar (see [GanttTheme.progressOverlayColor]). `null`
+  /// (the default) renders no overlay.
+  final double? progress;
+
+  /// An index into a consumer-supplied color palette.
+  ///
+  /// Only consulted by a [GanttTheme.colorResolver] a consumer supplies —
+  /// this package has no built-in palette.
+  final int? colorIndex;
+
+  /// The [key]s of activities this one depends on (predecessors).
+  ///
+  /// When set, a connector arrow is drawn from each predecessor to this
+  /// activity — see `DependencyArrows`. Only rendered in scroll mode (see
+  /// [GanttController.fixedDayWidth]).
+  final List<String>? dependsOn;
+
   /// Whether to show the activity cell.
   final bool showCell;
 
@@ -81,6 +101,32 @@ class GanttActivity<T> {
 
   /// The parent activity, if this is a child activity.
   GanttActivity? get parent => _parent;
+
+  /// The nesting depth of this activity (`0` for a root activity).
+  int get depth => parent == null ? 0 : parent!.depth + 1;
+
+  /// Whether this activity is the last child among its parent's [children].
+  ///
+  /// Always `true` for a root activity (no [parent]).
+  bool get isLastChild {
+    final siblings = parent?.children;
+    return siblings == null || identical(siblings.last, this);
+  }
+
+  /// One entry per ancestor depth (shallowest first): `true` means that
+  /// ancestor still has siblings below it, so a plain connector rail should
+  /// continue past this row at that depth; `false` means it was the last of
+  /// its own siblings, so the rail should stop. Does not describe this
+  /// activity's own branch point — see [isLastChild] for that.
+  List<bool> get treeGuides {
+    final guides = <bool>[];
+    var p = parent;
+    while (p != null) {
+      guides.add(!p.isLastChild);
+      p = p.parent;
+    }
+    return guides.reversed.toList();
+  }
 
   /// The limit of the start date of the activity.
   late DateTime? limitStart;
@@ -109,6 +155,9 @@ class GanttActivity<T> {
     this.onCellTap,
     this.cellBuilder,
     this.color,
+    this.progress,
+    this.colorIndex,
+    this.dependsOn,
     this.actions,
     this.showCell = true,
     this.builder,
@@ -119,7 +168,8 @@ class GanttActivity<T> {
          start.toDate.isBeforeOrSame(end.toDate) &&
              ((title == null) != (titleWidget == null)) &&
              ((cellBuilder == null) || (builder == null)) &&
-             ((listTitle == null) || (listTitleWidget == null)),
+             ((listTitle == null) || (listTitleWidget == null)) &&
+             (progress == null || (progress >= 0.0 && progress <= 1.0)),
        ) {
     this.start = start.toDate;
     this.end = end.toDate;

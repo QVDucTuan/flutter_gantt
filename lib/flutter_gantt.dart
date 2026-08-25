@@ -1,8 +1,12 @@
 export 'src/classes/activity.dart';
 export 'src/classes/date_holiday.dart';
+export 'src/classes/list_column.dart';
+export 'src/classes/marker.dart';
 export 'src/classes/theme.dart';
+export 'src/widgets/activities_table.dart';
 export 'src/widgets/cell.dart';
 export 'src/widgets/controller.dart';
 export 'src/widgets/gantt.dart';
 export 'src/widgets/range_selector.dart';
 export 'src/widgets/row.dart';
+export 'src/widgets/tree_indent.dart';

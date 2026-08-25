@@ -63,16 +63,48 @@ extension GanttCtrlInternal on GanttController {
     return name[0].toUpperCase() + name.substring(1);
   }
 
-  /// The number of days currently visible in the chart.
+  /// The number of days the chart currently needs to render.
+  ///
+  /// In fit mode (see [GanttController.fixedDayWidth]), this is exactly
+  /// [daysViews] (or a width-derived count when unset) — the chart always
+  /// shows this many days. In scroll mode, this instead spans from
+  /// [startDate] through the latest date referenced by any activity or
+  /// holiday, since the canvas scrolls to reveal the rest instead of
+  /// fitting everything into the viewport.
   int get internalDaysViews {
+    if (isScrollMode) {
+      final last = _lastRelevantDate;
+      final spanDays = last == null ? 1 : last.diffInDays(startDate) + 1;
+      return spanDays < 1 ? 1 : spanDays;
+    }
     if (daysViews != null) {
       return daysViews!;
     }
     return (gridWidth / theme.dayMinWidth).floor();
   }
 
-  /// The calculated width of each day column based on current grid width.
-  double get dayColumnWidth => gridWidth / internalDaysViews;
+  DateTime? get _lastRelevantDate {
+    final dates = <DateTime>[
+      ...activities.plainList.map((a) => a.end),
+      ...holidays.map((h) => h.date),
+    ];
+    if (dates.isEmpty) return null;
+    return DateTimeEx.lastDateFromList(dates);
+  }
+
+  /// The calculated width of each day column: [GanttController.fixedDayWidth]
+  /// in scroll mode, otherwise fit to the available grid width.
+  double get dayColumnWidth =>
+      isScrollMode ? fixedDayWidth! : gridWidth / internalDaysViews;
+
+  /// The total scrollable width of the chart canvas in scroll mode.
+  double get canvasWidth => dayColumnWidth * internalDaysViews;
+
+  /// The horizontal pixel offset of [date] from the canvas's left edge
+  /// ([startDate]) — the coordinate space absolutely-positioned overlays
+  /// (like dependency arrows) are drawn in.
+  double xForDate(DateTime date) =>
+      clampToGanttRange(date).diffInDays(startDate) * dayColumnWidth;
 
   /// The end date of the visible range (calculated).
   DateTime get endDate => startDate.add(Duration(days: internalDaysViews - 1));

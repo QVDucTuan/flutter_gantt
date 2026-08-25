@@ -1,0 +1,156 @@
+{
+  "meta": {
+    "generatedFrom": "example/lib/main.dart (_MyHomePageState.initState)",
+    "referenceDate": "2026-08-25",
+    "note": "Dates below are computed from 'now' = referenceDate, matching the Duration offsets in the Dart source (now-3, now+6, monthAgo-3, etc.)."
+  },
+  "activities": [
+    {
+      "key": "task1",
+      "title": "Main Task",
+      "tooltip": "WO-1001 | Top-level task across multiple days",
+      "start": "2026-08-22",
+      "end": "2026-08-31",
+      "status": "inProgress",
+      "priority": "high",
+      "assigneeName": "Nguyễn Văn A",
+      "actions": ["view", "edit", "delete"],
+      "children": [
+        {
+          "key": "task1.sub2",
+          "title": "Subtask 2",
+          "tooltip": "WO-1001-2 | Subtask with nested children",
+          "start": "2026-08-25",
+          "end": "2026-08-30",
+          "dependsOn": ["task1.sub1"],
+          "status": "inProgress",
+          "priority": "medium",
+          "assigneeName": "Trần Thị B",
+          "actions": ["addNested"],
+          "children": [
+            {
+              "key": "task1.sub2.subA",
+              "title": "Nested Subtask A",
+              "tooltip": "WO-1001-2A | Second-level task",
+              "start": "2026-08-26",
+              "end": "2026-08-28",
+              "showCell": false,
+              "status": "completed",
+              "priority": null,
+              "assigneeName": "Trần Thị B"
+            },
+            {
+              "key": "task1.sub2.subB",
+              "title": "Nested Subtask B",
+              "tooltip": "WO-1001-2B | Continued",
+              "start": "2026-08-27",
+              "end": "2026-08-29",
+              "showCell": false,
+              "status": "notStarted",
+              "priority": null,
+              "assigneeName": "Lê Văn C"
+            },
+            {
+              "key": "task1.sub2.subC",
+              "title": "Nested Subtask C",
+              "tooltip": "WO-1001-2B | Continued",
+              "start": "2026-08-27",
+              "end": "2026-08-29",
+              "showCell": false,
+              "status": "notStarted",
+              "priority": null,
+              "assigneeName": "Lê Văn D"
+            }
+          ]
+        },
+        {
+          "key": "task1.sub3",
+          "title": "Subtask 3",
+          "tooltip": "WO-1001-2 | Subtask with nested children",
+          "start": "2026-08-25",
+          "end": "2026-08-30",
+          "dependsOn": ["task1.sub1"],
+          "status": "notStarted",
+          "priority": "low",
+          "assigneeName": "Lê Văn C",
+          "actions": ["addNested"],
+          "children": [
+            {
+              "key": "task1.sub3.subA",
+              "title": "Nested Subtask A3",
+              "tooltip": "WO-1001-2A | Second-level task",
+              "start": "2026-08-26",
+              "end": "2026-08-28",
+              "showCell": false,
+              "status": "notStarted",
+              "priority": null,
+              "assigneeName": "Lê Văn C"
+            },
+            {
+              "key": "task1.sub3.subB",
+              "title": "Nested Subtask B3",
+              "tooltip": "WO-1001-2B | Continued",
+              "start": "2026-08-27",
+              "end": "2026-08-29",
+              "showCell": false,
+              "status": "notStarted",
+              "priority": null,
+              "assigneeName": "Phạm Thị D"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "task2",
+      "title": "Independent Task",
+      "tooltip": "A separate task",
+      "start": "2026-08-26",
+      "end": "2026-09-02",
+      "status": "inProgress",
+      "priority": "medium",
+      "assigneeName": "Huỳnh Thị Phương"
+    },
+    {
+      "key": "task3",
+      "title": "Archived Task",
+      "tooltip": "Task from one month ago",
+      "start": "2026-07-23",
+      "end": "2026-07-29",
+      "status": "completed",
+      "priority": null,
+      "assigneeName": "Nguyễn Văn A"
+    },
+    {
+      "key": "task4",
+      "title": "Older Task",
+      "tooltip": "Past task",
+      "start": "2026-08-15",
+      "end": "2026-08-21",
+      "progress": 1.0,
+      "status": "completed",
+      "priority": "low",
+      "assigneeName": "Trần Thị B"
+    },
+    {
+      "key": "task5",
+      "title": "Planned Future Task",
+      "tooltip": "Future scheduled task",
+      "start": "2026-09-19",
+      "end": "2026-09-26",
+      "status": "notStarted",
+      "priority": "high",
+      "assigneeName": "Lê Văn C"
+    },
+    {
+      "key": "task6",
+      "title": "Ongoing Project  [Long task] Lorem ipsum dolor sit amet consectetur adipiscing elit quisque faucibus ex sapien vitae pellentesque sem placerat in id cursus mi pretium tellus duis convallis tempus leo eu aenean sed diam.",
+      "tooltip": "Spanning multiple weeks",
+      "start": "2026-08-15",
+      "end": "2026-09-24",
+      "status": "overdue",
+      "priority": "high",
+      "assigneeName": "Phạm Thị D"
+    }
+  ]
+}

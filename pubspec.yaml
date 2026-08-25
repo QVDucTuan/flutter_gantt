@@ -11,6 +11,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_svg: ^2.0.10+1
   intl: ^0.20.2
   linked_scroll_controller: ^0.2.0
   provider: ^6.1.5+1
@@ -23,3 +24,7 @@ dev_dependencies:
 screenshots:
   - description: 'Flutter Gantt - screenshot 1'
     path: doc/static/img/flutter_gantt_screenshot.png
+
+flutter:
+  assets:
+    - assets/icons/

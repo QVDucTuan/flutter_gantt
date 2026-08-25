@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "example-web",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd /d D:\\QuocViet\\test_package\\fork_custom\\flutter_gantt\\example && flutter run -d web-server --web-port 8765"
+      ],
+      "port": 8765
+    }
+  ]
+}

@@ -23,44 +23,80 @@ class GanttCell extends StatefulWidget {
 }
 
 class _GanttCellState extends State<GanttCell> {
-  bool mouseOver = false;
-
-  /// Gets the cell color, falling back to theme's default if not specified.
+  /// Gets the cell color.
   ///
-  /// Returns the activity's custom color if set, otherwise returns the
-  /// default cell color from the current [GanttTheme].
-  Color get color =>
-      widget.activity.color ?? context.watch<GanttTheme>().defaultCellColor;
+  /// If [GanttTheme.colorResolver] is set, it fully owns the result
+  /// (including whether to honor the activity's own color). Otherwise falls
+  /// back to the activity's color, then the theme's [GanttTheme.defaultCellColor].
+  Color get color {
+    final activity = widget.activity;
+    final theme = context.watch<GanttTheme>();
+    return theme.colorResolver?.call(
+          activity.depth,
+          activity.colorIndex,
+          activity.color,
+        ) ??
+        activity.color ??
+        theme.defaultCellColor;
+  }
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: () => widget.activity.onCellTap?.call(widget.activity),
-    child: MouseRegion(
-      onEnter: (event) => setState(() => mouseOver = true),
-      onExit: (event) => setState(() => mouseOver = false),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 8.0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.only(
-            topLeft:
-                context.watch<GanttActivityCtrl>().cellsNotVisibleBefore
-                    ? Radius.zero
-                    : Radius.circular(context.watch<GanttTheme>().cellRounded),
-            bottomRight:
-                context.watch<GanttActivityCtrl>().cellsNotVisibleAfter
-                    ? Radius.zero
-                    : Radius.circular(context.watch<GanttTheme>().cellRounded),
-          ),
-          color: color.withValues(alpha: color.a * (mouseOver ? 0.7 : 1)),
-        ),
-        child:
-            widget.activity.titleWidget ??
-            Text(
-              widget.activity.title!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+  Widget build(BuildContext context) {
+    final theme = context.watch<GanttTheme>();
+    final ctrl = context.watch<GanttActivityCtrl>();
+    final progress = widget.activity.progress;
+    // Left corners square off when the bar's start is scrolled off-screen
+    // (it visually continues past the left edge); right corners the same
+    // for the end, off-screen to the right. Both corners on a given side
+    // round together — previously only topLeft/bottomRight were ever set,
+    // leaving topRight/bottomLeft permanently square regardless of theme.
+    final leftRadius =
+        ctrl.cellsNotVisibleBefore
+            ? Radius.zero
+            : Radius.circular(theme.cellRounded);
+    final rightRadius =
+        ctrl.cellsNotVisibleAfter
+            ? Radius.zero
+            : Radius.circular(theme.cellRounded);
+    final borderRadius = BorderRadius.only(
+      topLeft: leftRadius,
+      bottomLeft: leftRadius,
+      topRight: rightRadius,
+      bottomRight: rightRadius,
+    );
+
+    return InkWell(
+      onTap: () => widget.activity.onCellTap?.call(widget.activity),
+      hoverColor: Colors.transparent,
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(color: color),
+            if (progress != null)
+              FractionallySizedBox(
+                alignment: AlignmentDirectional.centerStart,
+                widthFactor: progress,
+                child: Container(color: theme.progressOverlayColor),
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child:
+                  widget.activity.titleWidget ??
+                  Text(
+                    widget.activity.title!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textStyle(
+                      weight: FontWeight.w600,
+                      color: theme.onBarTextColor(color),
+                    ),
+                  ),
             ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
