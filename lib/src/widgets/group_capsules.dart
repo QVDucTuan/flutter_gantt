@@ -66,6 +66,13 @@ class GanttGroupCapsules extends StatelessWidget {
         if (decoration != null) {
           double? top;
           double? bottom;
+          // The barInset of whichever descendant currently defines [top]/
+          // [bottom] — tracked so the capsule's own outward padding on that
+          // edge can be capped to it below, instead of always using the
+          // theme's full padding regardless of what's actually there to
+          // absorb it.
+          var topInset = 0.0;
+          var bottomInset = 0.0;
           for (final descendant in activity.plainList) {
             final rowGeometry = geometry[descendant.key];
             if (rowGeometry == null) continue;
@@ -77,20 +84,41 @@ class GanttGroupCapsules extends StatelessWidget {
             final barInset = descendant.showCell ? theme.barVerticalPadding : 0.0;
             final rowTop = rowGeometry.top + barInset;
             final rowBottom = rowGeometry.top + rowGeometry.height - barInset;
-            top = top == null ? rowTop : math.min(top, rowTop);
-            bottom = bottom == null ? rowBottom : math.max(bottom, rowBottom);
+            if (top == null || rowTop < top) {
+              top = rowTop;
+              topInset = barInset;
+            }
+            if (bottom == null || rowBottom > bottom) {
+              bottom = rowBottom;
+              bottomInset = barInset;
+            }
           }
           if (top != null && bottom != null) {
+            final horizontalPadding = _paddingForDepth(
+              theme.groupCapsuleHorizontalPadding,
+              depth,
+            );
             final left =
-                controller.xForDate(activity.start) -
-                theme.groupCapsuleHorizontalPadding;
+                controller.xForDate(activity.start) - horizontalPadding;
             final right =
                 controller.xForDate(activity.end) +
                 controller.dayColumnWidth +
-                theme.groupCapsuleHorizontalPadding;
-            final verticalPadding = _verticalPaddingForDepth(theme, depth);
-            final paddedTop = top - verticalPadding;
-            final paddedBottom = bottom + verticalPadding;
+                horizontalPadding;
+            final verticalPadding = _paddingForDepth(
+              theme.groupCapsuleVerticalPadding,
+              depth,
+            );
+            // Capped per edge to that edge's own row's inset — an ordinary
+            // bar row's inset (barVerticalPadding, 10 by default) comfortably
+            // covers the padding at any depth, so this is a no-op there; a
+            // checklist row's inset is 0, so its edge gets no outward padding
+            // at all instead of bleeding past its own row into whatever
+            // follows (see rowsGroupPadding's doc — rows are flush by
+            // default, with no gap of their own to absorb an overshoot).
+            final topPadding = math.min(verticalPadding, topInset);
+            final bottomPadding = math.min(verticalPadding, bottomInset);
+            final paddedTop = top - topPadding;
+            final paddedBottom = bottom + bottomPadding;
             capsules.add(
               _CapsuleSpec(
                 left: left,
@@ -146,14 +174,17 @@ class GanttGroupCapsules extends StatelessWidget {
   }
 }
 
-/// Shrinks [GanttTheme.groupCapsuleVerticalPadding] by depth so an outer
+/// Shrinks a capsule padding value ([GanttTheme.groupCapsuleVerticalPadding]
+/// or [GanttTheme.groupCapsuleHorizontalPadding]) by depth so an outer
 /// group's capsule always extends further than a nested group's — even
 /// though both may share the exact same last-descendant row (e.g. when a
 /// group's own last child is itself a group), their padded edges never land
 /// on the same pixel. Strictly decreasing and always positive, so this holds
-/// at any nesting depth, not just the common 2-level case.
-double _verticalPaddingForDepth(GanttTheme theme, int depth) =>
-    theme.groupCapsuleVerticalPadding / (depth + 1);
+/// at any nesting depth, not just the common 2-level case. Applied to both
+/// axes identically (not just vertical) so the ratio between them — and so
+/// how "even" the capsule's frame looks — stays constant at every depth,
+/// not just depth 0.
+double _paddingForDepth(double base, int depth) => base / (depth + 1);
 
 BoxDecoration _defaultCapsuleStyle(
   GanttTheme theme,

@@ -215,14 +215,18 @@ class GanttTheme {
   final GanttGroupCapsuleStyle? groupCapsuleStyle;
 
   /// The horizontal padding, in pixels, between a group capsule's edge and
-  /// the date span it wraps.
+  /// the date span it wraps — halved at each deeper nesting level (see
+  /// `GanttGroupCapsules`), so this is the depth-0 value.
   /// Defaults to 6.0.
   final double groupCapsuleHorizontalPadding;
 
   /// The vertical padding, in pixels, between a group capsule's top/bottom
   /// edge and the rows it wraps — halved at each deeper nesting level (see
-  /// `GanttGroupCapsules`), so this is the depth-0 value.
-  /// Defaults to 4.0.
+  /// `GanttGroupCapsules`), so this is the depth-0 value. Equal to
+  /// [groupCapsuleHorizontalPadding] by default so a capsule reads as an
+  /// even frame around its bar, not a taller-looking gap on the sides than
+  /// top/bottom.
+  /// Defaults to 6.0.
   final double groupCapsuleVerticalPadding;
 
   /// Formats a date for the floating tooltip shown while dragging a bar in
@@ -289,14 +293,20 @@ class GanttTheme {
   /// Defaults to 8.0.
   final double barVerticalPadding;
 
-  /// The vertical padding between rows.
-  /// Defaults to 0.0 (rows sit flush against each other); see
-  /// [rowsGroupPadding] for the wider gap still kept around a group's own
+  /// The vertical padding between rows that aren't a group boundary; see
+  /// [rowsGroupPadding] for the wider gap kept around a group's own
   /// capsule.
+  /// Defaults to 0.0 (non-group rows sit flush against each other).
   final double rowPadding;
 
-  /// The vertical padding between groups of rows.
-  /// Defaults to 16.0.
+  /// The vertical padding between groups of rows — applied around every
+  /// activity with children (see `rowTopPadding`), on top of [rowPadding].
+  /// A purely cosmetic knob for extra breathing room around groups; not
+  /// what keeps a group's capsule from bleeding into whatever row follows
+  /// it (`GanttGroupCapsules` clamps that per-edge on its own — see
+  /// [groupCapsuleVerticalPadding] — regardless of this value).
+  /// Defaults to 0.0 (rows sit flush, including across a group's own
+  /// boundary).
   final double rowsGroupPadding;
 
   /// The height of the header section.
@@ -332,11 +342,11 @@ class GanttTheme {
   static const double _defaultBarVerticalPadding = 10.0;
   static const double _defaultRowPadding = 0.0;
   // 0 so every row sits flush against the next, including across a group's
-  // own boundary — deliberately chosen over the 6.0 that would keep
-  // sibling group capsules (e.g. two Subtasks under the same Task) from
-  // ever touching: their capsules now overlap by a few px right at the
-  // shared edge (groupCapsuleVerticalPadding/(depth+1) on each side), a
-  // known, accepted tradeoff for fully flush rows.
+  // own boundary. Safe to keep at 0: a capsule's own outward padding is
+  // clamped per-edge to that edge's own row's barVerticalPadding inset (see
+  // GanttGroupCapsules), so it can never bleed past its own row's raw
+  // bounds into whatever follows — no shared gap needs to exist to absorb
+  // it.
   static const double _defaultRowsGroupPadding = 0.0;
   static const double _defaultHeaderHeight = 48.0;
   static const double _defaultDayMinWidth = 30.0;
@@ -344,7 +354,10 @@ class GanttTheme {
   static const double _defaultTreeIndentWidth = 14.0;
   static const double _defaultDependencyArrowWidth = 1.25;
   static const double _defaultGroupCapsuleHorizontalPadding = 6.0;
-  static const double _defaultGroupCapsuleVerticalPadding = 4.0;
+  // Equal to horizontal so a capsule's frame looks even on every side, at
+  // every nesting depth — see _paddingForDepth in group_capsules.dart, which
+  // now shrinks both axes by depth identically instead of just this one.
+  static const double _defaultGroupCapsuleVerticalPadding = 6.0;
   static const String _defaultFontFamily = 'packages/flutter_gantt/Montserrat';
   static const double _defaultFontSize = 12.0;
   static const double _defaultCellRounded = 8.0;
