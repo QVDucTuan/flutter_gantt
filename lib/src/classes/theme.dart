@@ -215,17 +215,26 @@ class GanttTheme {
   final GanttGroupCapsuleStyle? groupCapsuleStyle;
 
   /// The horizontal padding, in pixels, between a group capsule's edge and
-  /// the date span it wraps — halved at each deeper nesting level (see
-  /// `GanttGroupCapsules`), so this is the depth-0 value.
+  /// the date span it wraps — nudged down slightly at each deeper nesting
+  /// level, just enough that two nested capsules sharing the same
+  /// last-descendant row never draw their borders on the exact same pixel
+  /// (see `GanttGroupCapsules`); every depth still reads as the same
+  /// thickness at a glance. This is the depth-0 value.
   /// Defaults to 6.0.
   final double groupCapsuleHorizontalPadding;
 
   /// The vertical padding, in pixels, between a group capsule's top/bottom
-  /// edge and the rows it wraps — halved at each deeper nesting level (see
-  /// `GanttGroupCapsules`), so this is the depth-0 value. Equal to
-  /// [groupCapsuleHorizontalPadding] by default so a capsule reads as an
-  /// even frame around its bar, not a taller-looking gap on the sides than
-  /// top/bottom.
+  /// edge and the rows it wraps — nudged down the same way as
+  /// [groupCapsuleHorizontalPadding] at each deeper nesting level; this is
+  /// the depth-0 value. Equal to [groupCapsuleHorizontalPadding] by default
+  /// so a capsule reads as an even frame around its bar, not a
+  /// taller-looking gap on the sides than top/bottom. Also see
+  /// `GanttGroupCapsules`, which additionally caps this per-edge to that
+  /// edge's own bounding row's [barVerticalPadding] inset — an ordinary bar
+  /// row's inset comfortably covers this default, so it's a no-op there,
+  /// but a checklist row (`GanttActivity.showCell` false) has none, so that
+  /// edge gets no outward padding rather than bleeding into whatever row
+  /// follows it.
   /// Defaults to 6.0.
   final double groupCapsuleVerticalPadding;
 

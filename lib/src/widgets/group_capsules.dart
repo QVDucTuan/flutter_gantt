@@ -174,17 +174,20 @@ class GanttGroupCapsules extends StatelessWidget {
   }
 }
 
-/// Shrinks a capsule padding value ([GanttTheme.groupCapsuleVerticalPadding]
-/// or [GanttTheme.groupCapsuleHorizontalPadding]) by depth so an outer
-/// group's capsule always extends further than a nested group's — even
-/// though both may share the exact same last-descendant row (e.g. when a
-/// group's own last child is itself a group), their padded edges never land
-/// on the same pixel. Strictly decreasing and always positive, so this holds
-/// at any nesting depth, not just the common 2-level case. Applied to both
-/// axes identically (not just vertical) so the ratio between them — and so
-/// how "even" the capsule's frame looks — stays constant at every depth,
-/// not just depth 0.
-double _paddingForDepth(double base, int depth) => base / (depth + 1);
+/// Nudges a capsule padding value ([GanttTheme.groupCapsuleVerticalPadding]
+/// or [GanttTheme.groupCapsuleHorizontalPadding]) down slightly by depth so
+/// an outer group's capsule always extends a hair further than a nested
+/// group's — even though both may share the exact same last-descendant row
+/// (e.g. when a group's own last child is itself a group), their padded
+/// edges never land on the *exact* same pixel (which visibly double-draws
+/// the border there). Strictly decreasing and floored well above zero, so
+/// this holds at any nesting depth without ever visibly thinning a deeply
+/// nested capsule's own frame — the offset only needs to clear a pixel, not
+/// a fraction of the padding, so every depth still reads as "the same
+/// thickness" at a glance. Applied to both axes identically, so whatever
+/// the padding is at a given depth, it's the same on every side.
+double _paddingForDepth(double base, int depth) =>
+    math.max(base - depth * 0.5, 1.0);
 
 BoxDecoration _defaultCapsuleStyle(
   GanttTheme theme,
