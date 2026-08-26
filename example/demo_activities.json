@@ -14,7 +14,7 @@
       "status": "inProgress",
       "priority": "high",
       "assigneeName": "Nguyễn Văn A",
-      "actions": ["view", "edit", "delete"],
+      "orderId": "1", //sắp xếp thứ tự cùng level (sắp xếp bên thanh timeline)
       "children": [
         {
           "key": "task1.sub2",

@@ -2,6 +2,7 @@ name: flutter_gantt
 description: "Flutter package for rendering an interactive and customizable Gantt chart widget."
 version: 1.2.2
 homepage: https://github.com/insideapp-srl/flutter_gantt
+
 repository: https://github.com/insideapp-srl/flutter_gantt
 
 environment:
@@ -15,6 +16,7 @@ dependencies:
   intl: ^0.20.2
   linked_scroll_controller: ^0.2.0
   provider: ^6.1.5+1
+  
 
 dev_dependencies:
   flutter_lints: ^6.0.0
@@ -28,3 +30,25 @@ screenshots:
 flutter:
   assets:
     - assets/icons/
+
+  fonts:
+  - family: Montserrat
+    fonts:
+      - asset: assets/fonts/Montserrat-Thin-w100.ttf
+        weight: 100
+      - asset: assets/fonts/Montserrat-Extra-Light-w200.ttf
+        weight: 200
+      - asset: assets/fonts/Montserrat-Light-w300.ttf
+        weight: 300
+      - asset: assets/fonts/Montserrat-Regular-w400.ttf
+        weight: 400
+      - asset: assets/fonts/Montserrat-Medium-w500.ttf
+        weight: 500
+      - asset: assets/fonts/Montserrat-Semi-Bold-w600.ttf
+        weight: 600
+      - asset: assets/fonts/Montserrat-Bold-w700.ttf
+        weight: 700
+      - asset: assets/fonts/Montserrat-Extra-Bold-w800.ttf
+        weight: 800
+      - asset: assets/fonts/Montserrat-Black-w900.ttf
+        weight: 900

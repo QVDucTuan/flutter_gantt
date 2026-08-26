@@ -221,9 +221,13 @@ class GanttTheme {
   /// The font family used for all text the chart itself renders (bar
   /// titles, row names, date/month labels — not text supplied by a
   /// consumer via [GanttActivity.titleWidget]/`builder`/`cellBuilder`).
-  /// Defaults to `'Montserrat'`. If that font isn't loaded/bundled by the
-  /// host app, text simply falls back to the platform default — setting
-  /// this name alone never throws.
+  /// Defaults to `'packages/flutter_gantt/Montserrat'` — the bundled
+  /// Montserrat font, registered under this package's own name in the
+  /// FontManifest (Flutter always registers a package's fonts under
+  /// `packages/<package>/<family>`, even for the package's own internal
+  /// use — the plain family name is never registered). If the font isn't
+  /// loaded/bundled by the host app, text simply falls back to the
+  /// platform default — setting this name alone never throws.
   final String? fontFamily;
 
   /// The base font size, in logical pixels, for the chart's own text.
@@ -329,7 +333,7 @@ class GanttTheme {
   static const double _defaultDependencyArrowWidth = 1.25;
   static const double _defaultGroupCapsuleHorizontalPadding = 6.0;
   static const double _defaultGroupCapsuleVerticalPadding = 4.0;
-  static const String _defaultFontFamily = 'Montserrat'; 
+  static const String _defaultFontFamily = 'packages/flutter_gantt/Montserrat';
   static const double _defaultFontSize = 12.0;
   static const double _defaultCellRounded = 8.0;
   static const double _defaultChildrenPeekWidthThreshold = 90.0;
