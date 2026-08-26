@@ -33,6 +33,30 @@ class CalendarGrid extends StatelessWidget {
   /// If `null`, a fallback or built-in formatter may be used instead.
   final MonthToText? monthToText;
 
+  /// Reports this grid's real total header height after every layout — the
+  /// month row plus its divider (plus the week-number row too, when
+  /// [showIsoWeek] is on) **plus** the day-number row's own height (see
+  /// [_dayNumberSize]/[_dayNumberVerticalPadding]), since that row isn't a
+  /// distinct widget of its own here — it's painted at the top of the
+  /// (separately unbounded-height) days grid below, not measurable by
+  /// walking up from a single render object. [Gantt] uses the reported
+  /// total to size the activities-list header and every overlay that
+  /// otherwise assumes a fixed `GanttTheme.headerHeight` to match, so
+  /// nothing starts drawing bars/rows until *both* header rows have had
+  /// their real space, not just the month row's.
+  final ValueChanged<double>? onHeaderHeightMeasured;
+
+  /// The day-number circle's diameter, in pixels — see the day cell built in
+  /// [build]. Named (not a bare `22`/`4.0` there) so [onHeaderHeightMeasured]
+  /// can add up the exact same numbers instead of a separately-maintained
+  /// guess that could drift from the real rendering.
+  static const double _dayNumberSize = 22.0;
+
+  /// The vertical padding around the day-number circle, in pixels — applied
+  /// on both the top and bottom, so the day-number row's total height is
+  /// `_dayNumberSize + _dayNumberVerticalPadding * 2`.
+  static const double _dayNumberVerticalPadding = 4.0;
+
   /// Creates a [CalendarGrid] widget.
   ///
   /// [holidays] is optional and can be null when no holiday highlighting is needed.
@@ -42,6 +66,7 @@ class CalendarGrid extends StatelessWidget {
     this.holidays,
     this.showIsoWeek = false,
     this.monthToText,
+    this.onHeaderHeightMeasured,
   });
 
   /// Gets the background color for a specific date based on theme and holidays.
@@ -78,91 +103,127 @@ class CalendarGrid extends StatelessWidget {
     return dayHolidays.map((h) => '• $h').join('\n');
   }
 
+  /// The header portion: the month row, its divider, and (if [showIsoWeek])
+  /// the week-number row — everything above the days grid, *except* the
+  /// day-number row (see [onHeaderHeightMeasured] for why that one's added
+  /// in separately). Split out from [build] so it can be wrapped in its own
+  /// measuring [Builder] there, sized to exactly what it needs
+  /// (`mainAxisSize: MainAxisSize.min`) rather than however tall its parent
+  /// happens to be.
+  Widget _buildHeaderRows(BuildContext context, GanttController c) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      // Month headers row
+      Builder(
+        builder: (context) {
+          final months = c.getMonths(context, monthToText).entries.toList();
+          return Row(
+            children: List.generate(months.length, (i) {
+              final month = months[i];
+              return Expanded(
+                flex: month.value,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          month.key,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.watch<GanttTheme>().textStyle(
+                            size: context.watch<GanttTheme>().fontSize + 1,
+                            weight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      color:
+                          (i < months.length - 1)
+                              ? context.watch<GanttTheme>().dividerColor
+                              : Colors.transparent,
+                      height: 10,
+                    ),
+                  ],
+                ),
+              );
+            }),
+          );
+        },
+      ),
+      Container(height: 1, color: context.watch<GanttTheme>().dividerColor),
+      // Week numbers row
+      if (showIsoWeek)
+        Builder(
+          builder: (context) {
+            final weeks = c.weeks.entries.toList();
+            return Row(
+              children: List.generate(weeks.length, (i) {
+                final week = weeks[i];
+                return Expanded(
+                  flex: week.value,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            'W${week.key}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: context.watch<GanttTheme>().textStyle(
+                              size: 10,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        color:
+                            (i < weeks.length - 1)
+                                ? context.watch<GanttTheme>().dividerColor
+                                : Colors.transparent,
+                        height: 10,
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            );
+          },
+        ),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) => Consumer<GanttController>(
     builder:
         (context, c, child) => Column(
           children: [
-            // Month headers row
             Builder(
-              builder: (context) {
-                final months =
-                    c.getMonths(context, monthToText).entries.toList();
-                return Row(
-                  children: List.generate(months.length, (i) {
-                    final month = months[i];
-                    return Expanded(
-                      flex: month.value,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Center(
-                              child: Text(
-                                month.key,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: context.watch<GanttTheme>().textStyle(
-                                  size: context.watch<GanttTheme>().fontSize + 1,
-                                  weight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            width: 1,
-                            color:
-                                (i < months.length - 1)
-                                    ? context.watch<GanttTheme>().dividerColor
-                                    : Colors.transparent,
-                            height: 10,
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                );
+              builder: (headerContext) {
+                if (onHeaderHeightMeasured != null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!headerContext.mounted) return;
+                    final box = headerContext.findRenderObject() as RenderBox?;
+                    if (box != null && box.hasSize) {
+                      // The month/divider/week block's own real height,
+                      // *plus* the day-number row it doesn't include (see
+                      // this class's doc comment on [onHeaderHeightMeasured]
+                      // for why that row can't just be measured the same
+                      // way) — the two together are the grid's true total
+                      // header height.
+                      onHeaderHeightMeasured!(
+                        box.size.height +
+                            _dayNumberSize +
+                            _dayNumberVerticalPadding * 2,
+                      );
+                    }
+                  });
+                }
+                return _buildHeaderRows(headerContext, c);
               },
             ),
-            Container(height: 1, color: context.watch<GanttTheme>().dividerColor),
-            // Week numbers row
-            if (showIsoWeek)
-              Builder(
-                builder: (context) {
-                  final weeks = c.weeks.entries.toList();
-                  return Row(
-                    children: List.generate(weeks.length, (i) {
-                      final week = weeks[i];
-                      return Expanded(
-                        flex: week.value,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Center(
-                                child: Text(
-                                  'W${week.key}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.watch<GanttTheme>().textStyle(
-                                    size: 10,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              color:
-                                  (i < weeks.length - 1)
-                                      ? context.watch<GanttTheme>().dividerColor
-                                      : Colors.transparent,
-                              height: 10,
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  );
-                },
-              ),
             // Days grid
             Expanded(
               child: Row(
@@ -170,8 +231,8 @@ class CalendarGrid extends StatelessWidget {
                   final day = c.days[i];
                   final holiday = getDayHoliday(day);
                   final child = Container(
-                    width: 22,
-                    height: 22,
+                    width: _dayNumberSize,
+                    height: _dayNumberSize,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
@@ -210,7 +271,9 @@ class CalendarGrid extends StatelessWidget {
                             child: Stack(
                               children: [
                                 if (day.isToday &&
-                                    context.watch<GanttTheme>().todayLineColor !=
+                                    context
+                                            .watch<GanttTheme>()
+                                            .todayLineColor !=
                                         null)
                                   Align(
                                     alignment: Alignment.topCenter,
@@ -230,7 +293,7 @@ class CalendarGrid extends StatelessWidget {
                                   alignment: Alignment.topCenter,
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
-                                      vertical: 4.0,
+                                      vertical: _dayNumberVerticalPadding,
                                     ),
                                     child: Stack(
                                       clipBehavior: Clip.none,

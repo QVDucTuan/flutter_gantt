@@ -63,12 +63,7 @@ Color defaultGanttColorResolver(
     0.22,
     hsl.saturation * (depth == 1 ? 0.85 : 0.72),
   );
-  return HSLColor.fromAHSL(
-    1,
-    hsl.hue,
-    fillSaturation,
-    fillLightness,
-  ).toColor();
+  return HSLColor.fromAHSL(1, hsl.hue, fillSaturation, fillLightness).toColor();
 }
 
 /// Resolves the visual style of the background capsule wrapping an activity
@@ -512,5 +507,87 @@ class GanttTheme {
     dayMinWidth: dayMinWidth,
     cellRounded: cellRounded,
     childrenPeekWidthThreshold: childrenPeekWidthThreshold,
+  );
+
+  /// Returns a copy of this theme with the given fields replaced — every
+  /// other field carries over unchanged (unlike [GanttTheme.new]'s own
+  /// defaults, which fall back to the package's built-in values, not this
+  /// instance's). Used internally by [Gantt] to override just [headerHeight]
+  /// with the calendar header's actually-measured height (see
+  /// `CalendarGrid.onHeaderHeightMeasured`); equally useful for a consumer
+  /// tweaking one or two fields of an otherwise-shared base theme.
+  GanttTheme copyWith({
+    Color? backgroundColor,
+    Color? holidayColor,
+    Color? weekendColor,
+    Color? todayBackgroundColor,
+    Color? todayTextColor,
+    Color? defaultCellColor,
+    Color? progressOverlayColor,
+    GanttColorResolver? colorResolver,
+    Color? todayLineColor,
+    double? todayLineWidth,
+    Color? treeGuideColor,
+    double? treeIndentWidth,
+    Color? dividerColor,
+    GanttDepthIconBuilder? depthIconBuilder,
+    Color? dependencyArrowColor,
+    double? dependencyArrowWidth,
+    Color? hoverRowColor,
+    Color? selectedRowColor,
+    Color? textColor,
+    Color? barTextColor,
+    GanttGroupCapsuleStyle? groupCapsuleStyle,
+    double? groupCapsuleHorizontalPadding,
+    double? groupCapsuleVerticalPadding,
+    String Function(DateTime)? dragTooltipDateFormat,
+    String? fontFamily,
+    double? fontSize,
+    double? cellHeight,
+    double? barVerticalPadding,
+    double? rowPadding,
+    double? rowsGroupPadding,
+    double? headerHeight,
+    double? dayMinWidth,
+    double? cellRounded,
+    double? childrenPeekWidthThreshold,
+  }) => GanttTheme(
+    backgroundColor: backgroundColor ?? this.backgroundColor,
+    holidayColor: holidayColor ?? this.holidayColor,
+    weekendColor: weekendColor ?? this.weekendColor,
+    todayBackgroundColor: todayBackgroundColor ?? this.todayBackgroundColor,
+    todayTextColor: todayTextColor ?? this.todayTextColor,
+    defaultCellColor: defaultCellColor ?? this.defaultCellColor,
+    progressOverlayColor: progressOverlayColor ?? this.progressOverlayColor,
+    colorResolver: colorResolver ?? this.colorResolver,
+    todayLineColor: todayLineColor ?? this.todayLineColor,
+    todayLineWidth: todayLineWidth ?? this.todayLineWidth,
+    treeGuideColor: treeGuideColor ?? this.treeGuideColor,
+    treeIndentWidth: treeIndentWidth ?? this.treeIndentWidth,
+    dividerColor: dividerColor ?? this.dividerColor,
+    depthIconBuilder: depthIconBuilder ?? this.depthIconBuilder,
+    dependencyArrowColor: dependencyArrowColor ?? this.dependencyArrowColor,
+    dependencyArrowWidth: dependencyArrowWidth ?? this.dependencyArrowWidth,
+    hoverRowColor: hoverRowColor ?? this.hoverRowColor,
+    selectedRowColor: selectedRowColor ?? this.selectedRowColor,
+    textColor: textColor ?? this.textColor,
+    barTextColor: barTextColor ?? this.barTextColor,
+    groupCapsuleStyle: groupCapsuleStyle ?? this.groupCapsuleStyle,
+    groupCapsuleHorizontalPadding:
+        groupCapsuleHorizontalPadding ?? this.groupCapsuleHorizontalPadding,
+    groupCapsuleVerticalPadding:
+        groupCapsuleVerticalPadding ?? this.groupCapsuleVerticalPadding,
+    dragTooltipDateFormat: dragTooltipDateFormat ?? this.dragTooltipDateFormat,
+    fontFamily: fontFamily ?? this.fontFamily,
+    fontSize: fontSize ?? this.fontSize,
+    cellHeight: cellHeight ?? this.cellHeight,
+    barVerticalPadding: barVerticalPadding ?? this.barVerticalPadding,
+    rowPadding: rowPadding ?? this.rowPadding,
+    rowsGroupPadding: rowsGroupPadding ?? this.rowsGroupPadding,
+    headerHeight: headerHeight ?? this.headerHeight,
+    dayMinWidth: dayMinWidth ?? this.dayMinWidth,
+    cellRounded: cellRounded ?? this.cellRounded,
+    childrenPeekWidthThreshold:
+        childrenPeekWidthThreshold ?? this.childrenPeekWidthThreshold,
   );
 }

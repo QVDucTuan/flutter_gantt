@@ -303,6 +303,18 @@ class _GanttState extends State<Gantt> {
   // Tracks the last key we already centered on, so a notifyListeners() fired
   // for an unrelated change (e.g. mid-drag) doesn't re-trigger the scroll.
   String? _lastCenteredSelectionKey;
+  // The calendar header's actually-rendered total height (month row +
+  // divider + day-number row, plus the week row when shown) — see
+  // CalendarGrid.onHeaderHeightMeasured. `null` until the first frame
+  // reports it, during which `build` falls back to `theme.headerHeight`
+  // as-is (today's behavior, just for one frame).
+  double? _measuredHeaderHeight;
+
+  void _handleHeaderHeightMeasured(double height) {
+    if (_measuredHeaderHeight != height) {
+      setState(() => _measuredHeaderHeight = height);
+    }
+  }
 
   @override
   void initState() {
@@ -558,161 +570,188 @@ class _GanttState extends State<Gantt> {
   }
 
   @override
-  Widget build(BuildContext context) => MultiProvider(
-    providers: [
-      Provider<GanttTheme>.value(value: theme),
-      ChangeNotifierProvider<GanttController>.value(value: controller),
-    ],
-    builder: (context, child) {
-      final c = context.watch<GanttController>();
-      return Container(
-        decoration: BoxDecoration(
-          color: theme.backgroundColor,
-          border: Border.all(color: theme.dividerColor),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          children: [
-            SizedBox(
-              height: 4,
-              child: _loading ? LinearProgressIndicator() : Container(),
-            ),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: widget.activitiesListFlex,
-                    child: ActivitiesList(
-                      activities: c.activities,
-                      controller: _listController,
-                      showIsoWeek: widget.showIsoWeek,
-                      showTreeGuides: widget.showTreeGuides,
-                      columns: widget.listColumns,
-                      onActivitySecondaryTap: widget.onActivitySecondaryTap,
-                      initialColumnWidths: widget.initialColumnWidths,
-                      onColumnWidthsChanged: widget.onColumnWidthsChanged,
+  Widget build(BuildContext context) {
+    // Everything downstream (ActivitiesList's own header box, this divider,
+    // ActivitiesGrid's bars, every overlay) assumes `headerHeight` is
+    // exactly how tall the calendar's month/week/day-number rows actually
+    // render — but that depends on font metrics `theme.headerHeight` has no
+    // way to know in advance. Rather than guess at (or hardcode) a number,
+    // CalendarGrid measures its own real total header height post-frame
+    // (see onHeaderHeightMeasured) and this overrides `headerHeight` with
+    // it, so every consumer that reads `theme.headerHeight` via this same
+    // Provider automatically lines up with reality instead of a stale
+    // assumption. Falls back to the theme's own value verbatim until the
+    // first frame reports it.
+    final effectiveTheme =
+        _measuredHeaderHeight != null
+            ? theme.copyWith(
+              headerHeight:
+                  _measuredHeaderHeight! - (widget.showIsoWeek ? 10 : 0),
+            )
+            : theme;
+    return MultiProvider(
+      providers: [
+        Provider<GanttTheme>.value(value: effectiveTheme),
+        ChangeNotifierProvider<GanttController>.value(value: controller),
+      ],
+      builder: (context, child) {
+        final c = context.watch<GanttController>();
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.backgroundColor,
+            border: Border.all(color: theme.dividerColor),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              SizedBox(
+                height: 4,
+                child: _loading ? LinearProgressIndicator() : Container(),
+              ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: widget.activitiesListFlex,
+                      child: ActivitiesList(
+                        activities: c.activities,
+                        controller: _listController,
+                        showIsoWeek: widget.showIsoWeek,
+                        showTreeGuides: widget.showTreeGuides,
+                        columns: widget.listColumns,
+                        onActivitySecondaryTap: widget.onActivitySecondaryTap,
+                        initialColumnWidths: widget.initialColumnWidths,
+                        onColumnWidthsChanged: widget.onColumnWidthsChanged,
+                      ),
                     ),
-                  ),
-                  Container(width: 1, color: theme.dividerColor),
-                  Expanded(
-                    flex: widget.gridAreaFlex,
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        controller.gridWidth = constraints.maxWidth;
-                        final chart = Stack(
-                          children: [
-                            CalendarGrid(
-                              holidays: c.holidays,
-                              showIsoWeek: widget.showIsoWeek,
-                              monthToText: widget.monthToText,
-                            ),
-                            // Separates the calendar header (month/week/day
-                            // rows) from the bars below it, matching the
-                            // header/content divider under the activities
-                            // list's own column header.
-                            Positioned(
-                              top:
-                                  theme.headerHeight +
-                                  (widget.showIsoWeek ? 10 : 0) -
-                                  1,
-                              left: 0,
-                              right: 0,
-                              height: 1,
-                              child: Container(color: theme.dividerColor),
-                            ),
-                            if (c.isScrollMode && widget.showGroupCapsules)
-                              GanttGroupCapsules(
+                    Container(width: 1, color: theme.dividerColor),
+                    Expanded(
+                      flex: widget.gridAreaFlex,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          controller.gridWidth = constraints.maxWidth;
+                          final chart = Stack(
+                            children: [
+                              CalendarGrid(
+                                holidays: c.holidays,
+                                showIsoWeek: widget.showIsoWeek,
+                                monthToText: widget.monthToText,
+                                onHeaderHeightMeasured:
+                                    _handleHeaderHeightMeasured,
+                              ),
+                              // Separates the calendar header (month/week/day
+                              // rows) from the bars below it, matching the
+                              // header/content divider under the activities
+                              // list's own column header.
+                              Positioned(
+                                top:
+                                    effectiveTheme.headerHeight +
+                                    (widget.showIsoWeek ? 10 : 0) -
+                                    1,
+                                left: 0,
+                                right: 0,
+                                height: 1,
+                                child: Container(color: theme.dividerColor),
+                              ),
+                              if (c.isScrollMode && widget.showGroupCapsules)
+                                GanttGroupCapsules(
+                                  activities: c.activities,
+                                  verticalScrollController:
+                                      _gridColumnsController,
+                                  showIsoWeek: widget.showIsoWeek,
+                                ),
+                              if (widget.showTreeGuides)
+                                ChecklistTreeGuides(
+                                  activities: c.activities,
+                                  verticalScrollController:
+                                      _gridColumnsController,
+                                  showIsoWeek: widget.showIsoWeek,
+                                ),
+                              ActivitiesGrid(
+                                key: _activitiesGridKey,
                                 activities: c.activities,
-                                verticalScrollController: _gridColumnsController,
+                                controller: _gridColumnsController,
                                 showIsoWeek: widget.showIsoWeek,
                               ),
-                            if (widget.showTreeGuides)
-                              ChecklistTreeGuides(
+                              if (c.isScrollMode)
+                                DependencyArrows(
+                                  activities: c.activities,
+                                  verticalScrollController:
+                                      _gridColumnsController,
+                                  showIsoWeek: widget.showIsoWeek,
+                                ),
+                              MarkersOverlay(
                                 activities: c.activities,
-                                verticalScrollController: _gridColumnsController,
+                                verticalScrollController:
+                                    _gridColumnsController,
                                 showIsoWeek: widget.showIsoWeek,
                               ),
-                            ActivitiesGrid(
-                              key: _activitiesGridKey,
-                              activities: c.activities,
-                              controller: _gridColumnsController,
-                              showIsoWeek: widget.showIsoWeek,
-                            ),
-                            if (c.isScrollMode)
-                              DependencyArrows(
+                              ChildrenPeekOverlay(
                                 activities: c.activities,
-                                verticalScrollController: _gridColumnsController,
+                                verticalScrollController:
+                                    _gridColumnsController,
                                 showIsoWeek: widget.showIsoWeek,
                               ),
-                            MarkersOverlay(
-                              activities: c.activities,
-                              verticalScrollController: _gridColumnsController,
-                              showIsoWeek: widget.showIsoWeek,
-                            ),
-                            ChildrenPeekOverlay(
-                              activities: c.activities,
-                              verticalScrollController: _gridColumnsController,
-                              showIsoWeek: widget.showIsoWeek,
-                            ),
-                          ],
-                        );
-                        if (c.isScrollMode) {
-                          final width =
-                              c.canvasWidth > constraints.maxWidth
-                                  ? c.canvasWidth
-                                  : constraints.maxWidth;
-                          return Listener(
-                            onPointerSignal: _handlePointerSignal,
-                            // Mouse is deliberately excluded from drag-to-
-                            // scroll here (touch/trackpad keep it) so a
-                            // mouse click-drag is unambiguously "manipulate
-                            // a bar," never "pan the canvas" — the two
-                            // would otherwise compete for the same gesture.
-                            // Wheel scrolling is unaffected: it's handled
-                            // separately, above, via onPointerSignal.
-                            child: ScrollConfiguration(
-                              behavior: ScrollConfiguration.of(
-                                context,
-                              ).copyWith(
-                                dragDevices: const {
-                                  PointerDeviceKind.touch,
-                                  PointerDeviceKind.trackpad,
-                                },
-                              ),
-                              child: SingleChildScrollView(
-                                controller: _horizontalController,
-                                scrollDirection: Axis.horizontal,
-                                child: SizedBox(
-                                  width: width,
-                                  height: constraints.maxHeight,
-                                  child: chart,
+                            ],
+                          );
+                          if (c.isScrollMode) {
+                            final width =
+                                c.canvasWidth > constraints.maxWidth
+                                    ? c.canvasWidth
+                                    : constraints.maxWidth;
+                            return Listener(
+                              onPointerSignal: _handlePointerSignal,
+                              // Mouse is deliberately excluded from drag-to-
+                              // scroll here (touch/trackpad keep it) so a
+                              // mouse click-drag is unambiguously "manipulate
+                              // a bar," never "pan the canvas" — the two
+                              // would otherwise compete for the same gesture.
+                              // Wheel scrolling is unaffected: it's handled
+                              // separately, above, via onPointerSignal.
+                              child: ScrollConfiguration(
+                                behavior: ScrollConfiguration.of(
+                                  context,
+                                ).copyWith(
+                                  dragDevices: const {
+                                    PointerDeviceKind.touch,
+                                    PointerDeviceKind.trackpad,
+                                  },
+                                ),
+                                child: SingleChildScrollView(
+                                  controller: _horizontalController,
+                                  scrollDirection: Axis.horizontal,
+                                  child: SizedBox(
+                                    width: width,
+                                    height: constraints.maxHeight,
+                                    child: chart,
+                                  ),
                                 ),
                               ),
-                            ),
+                            );
+                          }
+                          return GestureDetector(
+                            onPanStart: _handlePanStart,
+                            onPanUpdate:
+                                (details) => _handlePanUpdate(
+                                  details,
+                                  constraints.maxWidth,
+                                  context,
+                                ),
+                            onPanEnd: _handlePanEnd,
+                            onPanCancel: _handlePanCancel,
+                            child: chart,
                           );
-                        }
-                        return GestureDetector(
-                          onPanStart: _handlePanStart,
-                          onPanUpdate:
-                              (details) => _handlePanUpdate(
-                                details,
-                                constraints.maxWidth,
-                                context,
-                              ),
-                          onPanEnd: _handlePanEnd,
-                          onPanCancel: _handlePanCancel,
-                          child: chart,
-                        );
-                      },
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
+            ],
+          ),
+        );
+      },
+    );
+  }
 }

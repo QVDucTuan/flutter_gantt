@@ -555,7 +555,16 @@ class _ActivitiesListState extends State<ActivitiesList> {
           return Column(
             children: [
               SizedBox(
-                height: theme.headerHeight + (widget.showIsoWeek ? 10 : 0),
+                // The 1px divider right below (only drawn when `columns` is
+                // set) is a separate sibling, not an overlay like the
+                // matching divider on the calendar side (see Gantt.build) —
+                // so without this -1, the two together would total
+                // `headerHeight + 1`, pushing this pane's rows a pixel
+                // below where the calendar's bars actually start.
+                height:
+                    theme.headerHeight +
+                    (widget.showIsoWeek ? 10 : 0) -
+                    (columns != null ? 1 : 0),
                 child:
                     widths != null
                         ? _buildHeaderRow(theme, widths, flexSpace)
