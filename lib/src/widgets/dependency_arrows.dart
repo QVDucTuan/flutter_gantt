@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../classes/activity.dart';
 import '../classes/theme.dart';
 import '../utils/row_geometry.dart';
+import 'below_header_clip.dart';
 import 'controller.dart';
 import 'controller_extension.dart';
 
@@ -72,7 +73,8 @@ class DependencyArrows extends StatelessWidget {
     if (arrows.isEmpty) return const SizedBox.shrink();
 
     return IgnorePointer(
-      child: ClipRect(
+      child: BelowHeaderClip(
+        top: headerOffset,
         child: ListenableBuilder(
           listenable: verticalScrollController,
           builder: (context, child) {

@@ -155,45 +155,68 @@ class _GanttActivityRowState extends State<GanttActivityRow> {
   /// (still inside the parent's group capsule, since a child's dates always
   /// fall inside its parent's), instead of drifting left/right relative to
   /// each other purely because their own start dates differ.
+  ///
+  /// Renders nothing (the row's own slot stays reserved — geometry, tree
+  /// guides, and the linked list/chart scroll all still depend on it) once
+  /// the parent's own bar drops below [GanttTheme.childrenPeekWidthThreshold]
+  /// — this content would otherwise render at full size regardless of how
+  /// narrow the parent's date span is, visually spilling out past its group
+  /// capsule. [GanttCell] shows a hover icon on the parent's bar instead
+  /// (see [Gantt.onPeekChildrenTap]); the activities list pane is
+  /// unaffected either way, since it was never date-width-bound.
+  ///
+  /// Above that threshold, content is still bounded to the parent's own
+  /// rendered width (not left free to span the rest of the canvas row) —
+  /// otherwise a name too long to fit would keep overflowing past the
+  /// group capsule instead of ellipsizing at its edge, the same visual
+  /// spill the threshold above exists to prevent, just at a wider bar.
   Widget _buildChecklistRow(
     BuildContext context,
     GanttActivity activity,
     GanttActivityCtrl ctrl,
   ) {
     final theme = context.watch<GanttTheme>();
+    final controller = context.watch<GanttController>();
     final parent = activity.parent;
+    final parentWidth =
+        parent == null
+            ? null
+            : controller.dayColumnWidth * controller.getCellDays(parent);
+    if (parentWidth != null && parentWidth < theme.childrenPeekWidthThreshold) {
+      return const SizedBox.shrink();
+    }
     final spaceBefore =
         parent == null
             ? ctrl.spaceBefore
-            : ctrl.dayColumnWidth *
-                context.watch<GanttController>().getCellDaysBefore(parent);
+            : ctrl.dayColumnWidth * controller.getCellDaysBefore(parent);
+    final content = Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Row(
+        children: [
+          // Reserves indent width only — actual guide lines are
+          // painted by ChecklistTreeGuides instead, as one continuous
+          // background layer (see its doc comment for why a per-row
+          // painter can't do this).
+          GanttTreeIndent(activity: activity, showGuides: false),
+          Expanded(
+            child:
+                activity.titleWidget ??
+                Text(
+                  activity.listTitle ?? activity.title ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textStyle(weight: FontWeight.w500),
+                ),
+          ),
+        ],
+      ),
+    );
     return Row(
       children: [
         SizedBox(width: spaceBefore),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Row(
-              children: [
-                // Reserves indent width only — actual guide lines are
-                // painted by ChecklistTreeGuides instead, as one continuous
-                // background layer (see its doc comment for why a per-row
-                // painter can't do this).
-                GanttTreeIndent(activity: activity, showGuides: false),
-                Expanded(
-                  child:
-                      activity.titleWidget ??
-                      Text(
-                        activity.listTitle ?? activity.title ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textStyle(weight: FontWeight.w500),
-                      ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        parentWidth == null
+            ? Expanded(child: content)
+            : SizedBox(width: parentWidth, child: content),
       ],
     );
   }
@@ -270,7 +293,11 @@ class _GanttActivityRowState extends State<GanttActivityRow> {
                   final daysDeltaTemp =
                       (dxTotal / _ctrl.dayColumnWidth).round();
                   if (_ctrl.cellVisibleDays - daysDeltaTemp > 0 &&
-                      widget.activity.validStartMove(daysDeltaTemp)) {
+                      (widget.activity.validStartMove(daysDeltaTemp) ||
+                          (_ctrl.controller.allowParentIndependentDateMovement &&
+                              widget.activity.validStartMoveIgnoringChildren(
+                                daysDeltaTemp,
+                              )))) {
                     daysDelta = daysDeltaTemp;
                   }
                   _movementStartOffset = _ctrl.dayColumnWidth * daysDelta!;
@@ -308,7 +335,11 @@ class _GanttActivityRowState extends State<GanttActivityRow> {
                   final daysDeltaTemp =
                       (dxTotal / _ctrl.dayColumnWidth).round();
                   if (_ctrl.cellVisibleDays + daysDeltaTemp > 0 &&
-                      widget.activity.validEndMove(daysDeltaTemp)) {
+                      (widget.activity.validEndMove(daysDeltaTemp) ||
+                          (_ctrl.controller.allowParentIndependentDateMovement &&
+                              widget.activity.validEndMoveIgnoringChildren(
+                                daysDeltaTemp,
+                              )))) {
                     daysDelta = daysDeltaTemp;
                   }
                   _movementEndOffset = _ctrl.dayColumnWidth * daysDelta!;

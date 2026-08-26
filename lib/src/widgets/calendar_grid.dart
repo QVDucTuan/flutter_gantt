@@ -102,6 +102,7 @@ class CalendarGrid extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: context.watch<GanttTheme>().textStyle(
+                                  size: context.watch<GanttTheme>().fontSize + 1,
                                   weight: FontWeight.w600,
                                 ),
                               ),

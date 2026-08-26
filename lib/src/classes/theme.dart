@@ -32,9 +32,9 @@ const List<({double s, double l})> _ganttBarTones = [
 /// The hue QV Agent Hub's own `colorIndex` 0 preset resolves to (their
 /// `hueForIndex`, evaluated at index 0). This package simplifies their
 /// 100-hue rotating palette (one hue per Task) down to this single hue
-/// family, so every activity here reads as one consistent color instead of
-/// an arbitrary one per row — pass your own [GanttColorResolver] (or
-/// `null`) to `GanttTheme.colorResolver` to opt back into per-activity hues.
+/// family for activities with no explicit color — pass a `color` on the
+/// Task itself (see [GanttActivity.withColor]) when the app wants to decide
+/// each Task's color itself instead.
 const double _ganttBarHue = 95;
 
 /// The package's built-in default [GanttColorResolver]: QV Agent Hub's own
@@ -187,14 +187,14 @@ class GanttTheme {
 
   /// The background tint for an activities-list row while the pointer
   /// hovers over it. Only shown in the list pane, not the chart pane.
-  /// Defaults to a faint tint of [textColor].
+  /// Defaults to grey at 5% opacity.
   final Color hoverRowColor;
 
   /// The background tint for the currently-selected row (see
   /// [GanttController.selectedActivityKey]), shown across the full row
   /// width in both the activities list and the chart pane, so which row is
   /// selected reads clearly on either side.
-  /// Defaults to a light tint of [todayBackgroundColor].
+  /// Defaults to grey at 10% opacity.
   final Color selectedRowColor;
 
   /// An optional hook to style the background capsule wrapping an activity
@@ -295,6 +295,19 @@ class GanttTheme {
   /// Defaults to 8.0 (a slight rounding).
   final double cellRounded;
 
+  /// The rendered bar-width threshold, in pixels, below which an activity
+  /// with children is considered "too narrow" — its checklist children
+  /// (see `GanttActivity.showCell`) stop rendering their normal content in
+  /// the chart pane (they'd otherwise render at full size regardless of how
+  /// short the parent's own date span is, visually spilling out past its
+  /// group capsule), and its bar shows a small hover icon instead (see
+  /// `Gantt.onPeekChildrenTap`) — tapping it is meant to reveal the same
+  /// content some other way (e.g. a popup), since it's still there, just
+  /// not shown inline. The activities list pane is unaffected either way —
+  /// it was never date-width-bound to begin with.
+  /// Defaults to 90.0.
+  final double childrenPeekWidthThreshold;
+
   // Dimension defaults below match QV Agent Hub's own Gantt constants (see
   // doc/timeline-flutter-port/04-domain-logic.md's `ROW_H`/`AXIS_H`/
   // `TREE_INDENT`) — cellHeight/headerHeight/treeIndentWidth are QV's exact
@@ -319,6 +332,7 @@ class GanttTheme {
   static const String _defaultFontFamily = 'Montserrat'; 
   static const double _defaultFontSize = 12.0;
   static const double _defaultCellRounded = 8.0;
+  static const double _defaultChildrenPeekWidthThreshold = 90.0;
 
   // Color defaults below match QV Agent Hub's own design tokens (see
   // doc/timeline-flutter-port/10-design-tokens-and-shared-ui.md and, for
@@ -335,8 +349,11 @@ class GanttTheme {
   static const Color _defaultDividerColor = Color(0xFFCCD0DE);
   static const Color _defaultDependencyArrowColor = Color(0xFF97A0AF);
   static const Color _defaultTextColor = Color(0xFF324F6A);
-  static const Color _defaultHoverRowColor = Color(0x0D324F6A);
-  static const Color _defaultSelectedRowColor = Color(0x1A0D90D9);
+  // Grey at 5%/10% opacity respectively (0x0D/0x1A alpha over Material
+  // grey 500, 0x9E9E9E) — not tinted to any other theme color, per an
+  // explicit request to make both neutral grey instead.
+  static const Color _defaultHoverRowColor = Color(0x0D9E9E9E);
+  static const Color _defaultSelectedRowColor = Color(0x1A9E9E9E);
 
   /// Creates a [GanttTheme] with customizable properties.
   const GanttTheme({
@@ -373,6 +390,7 @@ class GanttTheme {
     this.headerHeight = _defaultHeaderHeight,
     this.dayMinWidth = _defaultDayMinWidth,
     this.cellRounded = _defaultCellRounded,
+    this.childrenPeekWidthThreshold = _defaultChildrenPeekWidthThreshold,
   });
 
   /// Creates a [GanttTheme] using QV Agent Hub's own colors by default —
@@ -420,6 +438,7 @@ class GanttTheme {
     double headerHeight = _defaultHeaderHeight,
     double dayMinWidth = _defaultDayMinWidth,
     double cellRounded = _defaultCellRounded,
+    double childrenPeekWidthThreshold = _defaultChildrenPeekWidthThreshold,
   }) => GanttTheme(
     backgroundColor: backgroundColor ?? _defaultBackgroundColor,
     defaultCellColor: defaultCellColor ?? _defaultCellColor,
@@ -454,5 +473,6 @@ class GanttTheme {
     headerHeight: headerHeight,
     dayMinWidth: dayMinWidth,
     cellRounded: cellRounded,
+    childrenPeekWidthThreshold: childrenPeekWidthThreshold,
   );
 }

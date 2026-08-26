@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -7,6 +9,11 @@ import '../utils/datetime.dart';
 /// Callback type for activity dates changes.
 typedef GanttActivityOnChangedEvent =
     void Function(GanttActivity activity, DateTime? start, DateTime? end);
+
+/// Callback type for the children-peek icon being tapped (see
+/// [Gantt.onPeekChildrenTap]).
+typedef GanttPeekChildrenTapEvent =
+    void Function(GanttActivity activity, Offset globalPosition);
 
 /// The drag/resize interaction a [Gantt] chart's bars use.
 enum GanttInteractionMode {
@@ -32,6 +39,7 @@ class GanttController extends ChangeNotifier {
   List<GanttMarker> _markers = [];
   int? _daysViews;
   final List<GanttActivityOnChangedEvent> _onActivityChangedListeners = [];
+  final List<GanttPeekChildrenTapEvent> _onPeekChildrenTapListeners = [];
   double gridWidth = 0;
   List<DateTime> _highlightedDates = [];
   bool _enableDraggable = true;
@@ -42,6 +50,8 @@ class GanttController extends ChangeNotifier {
   GanttInteractionMode _interactionMode = GanttInteractionMode.selectableDrag;
   String? _selectedActivityKey;
   final Set<String> _collapsedKeys = {};
+  String? _hoveredActivityKey;
+  Timer? _hoverClearTimer;
 
   /// Scroll mode (see [fixedDayWidth]) is on by default, at this pixel
   /// width per day.
@@ -205,6 +215,41 @@ class GanttController extends ChangeNotifier {
     }
   }
 
+  /// The key of the activity whose bar is currently hovered, for the
+  /// purposes of showing its children-peek badge (see
+  /// `ChildrenPeekOverlay`/[GanttTheme.childrenPeekWidthThreshold]). `null`
+  /// when nothing relevant is hovered. Set via [hoverActivity] /
+  /// [scheduleUnhoverActivity], not directly.
+  String? get hoveredActivityKey => _hoveredActivityKey;
+
+  /// Marks [key] as hovered, cancelling any pending [scheduleUnhoverActivity]
+  /// clear. Called both by the bar itself (`GanttCell`) and by its own peek
+  /// badge (`ChildrenPeekOverlay`) — since those are different widgets with
+  /// a small screen-space gap between them, sharing this single source of
+  /// truth (instead of separate local hover flags) is what lets the pointer
+  /// cross that gap without the badge disappearing first.
+  void hoverActivity(String key) {
+    _hoverClearTimer?.cancel();
+    if (_hoveredActivityKey != key) {
+      _hoveredActivityKey = key;
+      notifyListeners();
+    }
+  }
+
+  /// Schedules clearing [hoveredActivityKey] for [key] after a short delay
+  /// — cancelled if [hoverActivity] is called again (for this or any other
+  /// key) before it fires, e.g. because the pointer moved onto the badge
+  /// itself instead of leaving the area entirely.
+  void scheduleUnhoverActivity(String key) {
+    _hoverClearTimer?.cancel();
+    _hoverClearTimer = Timer(const Duration(milliseconds: 250), () {
+      if (_hoveredActivityKey == key) {
+        _hoveredActivityKey = null;
+        notifyListeners();
+      }
+    });
+  }
+
   /// Whether [key] is currently collapsed (its children hidden in both the
   /// activities list and the chart). `false` for any key never toggled.
   bool isCollapsed(String key) => _collapsedKeys.contains(key);
@@ -333,6 +378,7 @@ class GanttController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _hoverClearTimer?.cancel();
     removeAllFetchListener();
     super.dispose();
   }
@@ -371,4 +417,19 @@ class GanttController extends ChangeNotifier {
   /// Gets the list of dates change listeners.
   List<GanttActivityOnChangedEvent> get onActivityChangedListeners =>
       _onActivityChangedListeners;
+
+  /// Adds a listener for the children-peek icon being tapped (see
+  /// [Gantt.onPeekChildrenTap]).
+  void addOnPeekChildrenTapListener(GanttPeekChildrenTapEvent listener) {
+    _onPeekChildrenTapListeners.add(listener);
+  }
+
+  /// Removes a children-peek tap listener.
+  void removeOnPeekChildrenTapListener(GanttPeekChildrenTapEvent listener) {
+    _onPeekChildrenTapListeners.remove(listener);
+  }
+
+  /// Gets the list of children-peek tap listeners.
+  List<GanttPeekChildrenTapEvent> get onPeekChildrenTapListeners =>
+      _onPeekChildrenTapListeners;
 }

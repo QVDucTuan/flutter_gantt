@@ -65,7 +65,7 @@ class _GanttCellState extends State<GanttCell> {
       bottomRight: rightRadius,
     );
 
-    return InkWell(
+    final bar = InkWell(
       onTap: () => widget.activity.onCellTap?.call(widget.activity),
       hoverColor: Colors.transparent,
       child: ClipRRect(
@@ -82,21 +82,48 @@ class _GanttCellState extends State<GanttCell> {
               ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child:
-                  widget.activity.titleWidget ??
-                  Text(
-                    widget.activity.title!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textStyle(
-                      weight: FontWeight.w600,
-                      color: theme.onBarTextColor(color),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child:
+                    widget.activity.titleWidget ??
+                    Text(
+                      widget.activity.title!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textStyle(
+                        weight: FontWeight.w600,
+                        color: theme.onBarTextColor(color),
+                      ),
                     ),
-                  ),
+              ),
             ),
           ],
         ),
       ),
+    );
+
+    // Subtask only (depth 1), not the top-level Task — see
+    // ChildrenPeekOverlay, which applies the same restriction; matched here
+    // too so hovering a Task's bar doesn't even bother reporting it.
+    if (widget.activity.depth != 1 || widget.activity.children?.isNotEmpty != true) {
+      return bar;
+    }
+
+    // Doesn't render the peek badge itself — a bar this narrow is
+    // width-constrained by its own ancestor SizedBox (sized exactly to its
+    // date span, for correct resize-handle/tap-region geometry), so
+    // anything painted past its edge via Positioned/Clip.none would be
+    // visible but NOT hit-testable (Flutter's hit-testing rejects a
+    // position outside a RenderBox's own resolved size before ever
+    // checking overflowing children — a real gotcha, not a hypothetical
+    // one: that's exactly why the badge used to be unclickable). Instead,
+    // this only reports hover state on the controller; `ChildrenPeekOverlay`
+    // (a sibling layer with genuinely wide bounds, like `MarkersOverlay`)
+    // reads it and draws the actual badge at an absolute canvas position.
+    return MouseRegion(
+      onEnter: (_) => ctrl.controller.hoverActivity(widget.activity.key),
+      onExit: (_) => ctrl.controller.scheduleUnhoverActivity(widget.activity.key),
+      child: bar,
     );
   }
 }

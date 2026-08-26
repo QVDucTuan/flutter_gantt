@@ -7,6 +7,7 @@ import '../classes/activity.dart';
 import '../classes/theme.dart';
 import '../utils/datetime.dart';
 import '../utils/row_geometry.dart';
+import 'below_header_clip.dart';
 import 'controller.dart';
 import 'controller_extension.dart';
 
@@ -84,7 +85,8 @@ class MarkersOverlay extends StatelessWidget {
 
     if (glyphs.isEmpty) return const SizedBox.shrink();
 
-    return ClipRect(
+    return BelowHeaderClip(
+      top: headerOffset,
       child: ListenableBuilder(
         listenable: verticalScrollController,
         builder: (context, child) {

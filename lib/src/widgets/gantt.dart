@@ -8,6 +8,7 @@ import 'activities_grid.dart';
 import 'activities_list.dart';
 import 'calendar_grid.dart';
 import 'checklist_tree_guides.dart';
+import 'children_peek_overlay.dart';
 import 'controller_extension.dart';
 import 'dependency_arrows.dart';
 import 'group_capsules.dart';
@@ -89,13 +90,19 @@ class Gantt extends StatefulWidget {
   /// Enable draggable cell.
   final bool enableDraggable;
 
-  /// Whether dragging (moving, not resizing) a parent activity's bar is
-  /// constrained only by its own parent's date range, ignoring its
-  /// children's fixed dates — since a move doesn't shift children along
-  /// with it, requiring them to stay inside the new window would make any
-  /// activity with children effectively undraggable. Defaults to `true`.
-  /// Resizing (via an edge handle) still respects children's dates either
-  /// way, since shrinking past one would visually clip it.
+  /// Whether dragging or resizing a parent activity's bar is constrained
+  /// only by its own parent's date range, ignoring its children's current
+  /// dates — since neither a move nor a resize adjusts children on its own,
+  /// requiring them to stay inside the new window would make any activity
+  /// with children effectively un-draggable/un-resizable past them.
+  /// Defaults to `true`.
+  ///
+  /// With this on, use [onActivityChanged] to reconcile children yourself —
+  /// e.g. shift every descendant by the same delta on a move, or clamp a
+  /// descendant's date to the new range on a resize — the same way you
+  /// already update the dragged activity's own date. Without it, a child
+  /// left behind outside its parent's new range would otherwise render
+  /// looking clipped/detached.
   final bool allowParentIndependentDateMovement;
 
   /// The list of dates to highlight
@@ -152,6 +159,39 @@ class Gantt extends StatefulWidget {
   /// ```
   final void Function(GanttActivity activity, Offset globalPosition)?
   onActivitySecondaryTap;
+
+  /// Called when the small "peek children" icon on a bar is tapped — with
+  /// the activity and the pointer's global position. `null` (the default)
+  /// does nothing.
+  ///
+  /// [GanttCell] shows that icon, on hover, only for an activity that has
+  /// children (e.g. a Subtask with checklist Subitems) whose bar is too
+  /// narrow to make that obvious any other way — resized down to a few
+  /// days, its own title barely fits, let alone a hint that there's more
+  /// nested underneath. There's no built-in popup content, since it should
+  /// look like whatever your `listColumns`/`titleWidget` already render for
+  /// those children — typically you'd reuse the exact same widgets in a
+  /// `showMenu`, positioned at [Offset]:
+  ///
+  /// ```dart
+  /// Gantt(
+  ///   onPeekChildrenTap: (activity, position) async {
+  ///     await showMenu<void>(
+  ///       context: context,
+  ///       position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx, position.dy),
+  ///       items: [
+  ///         for (final child in activity.children ?? const [])
+  ///           PopupMenuItem<void>(
+  ///             enabled: false,
+  ///             child: child.titleWidget ?? Text(child.title ?? ''),
+  ///           ),
+  ///       ],
+  ///     );
+  ///   },
+  /// )
+  /// ```
+  final void Function(GanttActivity activity, Offset globalPosition)?
+  onPeekChildrenTap;
 
   /// Restores [listColumns] widths from a previous session — one ratio per
   /// column (each `0.0`–`1.0`, summed across the flex-based columns). Must
@@ -225,6 +265,7 @@ class Gantt extends StatefulWidget {
     this.showTreeGuides = false,
     this.showGroupCapsules = false,
     this.onActivitySecondaryTap,
+    this.onPeekChildrenTap,
     this.initialColumnWidths,
     this.onColumnWidthsChanged,
     this.listColumns,
@@ -279,6 +320,9 @@ class _GanttState extends State<Gantt> {
     controller.addListener(_onControllerChangedForCentering);
     if (widget.onActivityChanged != null) {
       controller.addOnActivityChangedListener(widget.onActivityChanged!);
+    }
+    if (widget.onPeekChildrenTap != null) {
+      controller.addOnPeekChildrenTapListener(widget.onPeekChildrenTap!);
     }
     if (widget.holidays != null) {
       controller.setHolidays(widget.holidays!, notify: false);
@@ -354,6 +398,9 @@ class _GanttState extends State<Gantt> {
     controller.removeListener(_onControllerChangedForCentering);
     if (widget.onActivityChanged != null) {
       controller.removeOnActivityChangedListener(widget.onActivityChanged!);
+    }
+    if (widget.onPeekChildrenTap != null) {
+      controller.removeOnPeekChildrenTapListener(widget.onPeekChildrenTap!);
     }
     controller.attachHorizontalScrollController(null);
     if (widget.controller == null) {
@@ -599,6 +646,11 @@ class _GanttState extends State<Gantt> {
                                 showIsoWeek: widget.showIsoWeek,
                               ),
                             MarkersOverlay(
+                              activities: c.activities,
+                              verticalScrollController: _gridColumnsController,
+                              showIsoWeek: widget.showIsoWeek,
+                            ),
+                            ChildrenPeekOverlay(
                               activities: c.activities,
                               verticalScrollController: _gridColumnsController,
                               showIsoWeek: widget.showIsoWeek,

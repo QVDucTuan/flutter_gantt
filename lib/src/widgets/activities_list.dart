@@ -407,7 +407,12 @@ class _ActivitiesListState extends State<ActivitiesList> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               columns[i].header,
-              style: theme.textStyle(weight: FontWeight.w600),
+              // A couple points larger than a cell's own text — visually
+              // sets the column titles apart from the rows underneath.
+              style: theme.textStyle(
+                size: theme.fontSize + 2,
+                weight: FontWeight.w600,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),

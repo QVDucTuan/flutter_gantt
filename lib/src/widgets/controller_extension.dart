@@ -185,6 +185,15 @@ extension GanttCtrlInternal on GanttController {
     }
   }
 
+  /// Notifies listeners that [activity]'s children-peek icon was tapped —
+  /// called by [GanttCell] itself, not meant to be called directly. See
+  /// [Gantt.onPeekChildrenTap].
+  void notifyPeekChildrenTap(GanttActivity activity, Offset globalPosition) {
+    for (final listener in onPeekChildrenTapListeners) {
+      listener(activity, globalPosition);
+    }
+  }
+
   /// Returns a map of ISO week numbers to the number of days
   /// contained in each week within the current visible range.
   ///

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -95,6 +96,9 @@ class _SubitemChecklistTitleState extends State<SubitemChecklistTitle> {
             onChanged: (value) => setState(() => _checked = value ?? false),
             visualDensity: VisualDensity.compact,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            fillColor: WidgetStateProperty.all(Colors.white),
+            checkColor: theme.textColor,
+            side: BorderSide(color: Colors.grey, width: 1),
           ),
         ),
         const SizedBox(width: 4),
@@ -134,6 +138,19 @@ typedef TaskMeta =
 enum DemoTaskStatus { notStarted, inProgress, completed, overdue }
 
 enum DemoTaskPriority { low, medium, high }
+
+final _taskColorRandom = math.Random();
+
+/// The app decides each Task's color itself — here, at random. Passed to
+/// [GanttActivity.withColor] so the whole Task family shares it; the
+/// package's default color resolver takes it from there and lightens it
+/// per descendant depth.
+Color _randomTaskColor() => HSLColor.fromAHSL(
+  1,
+  _taskColorRandom.nextDouble() * 360,
+  0.55 + _taskColorRandom.nextDouble() * 0.15,
+  0.5 + _taskColorRandom.nextDouble() * 0.1,
+).toColor();
 
 Widget _statusGlyph(DemoTaskStatus status) {
   final (icon, color) = switch (status) {
@@ -245,11 +262,6 @@ class _MyHomePageState extends State<MyHomePage> {
         start: now.subtract(const Duration(days: 3)),
         end: now.add(const Duration(days: 6)),
         title: 'Main Task',
-        tooltip: 'WO-1001 | Top-level task across multiple days',
-        // No explicit color: falls back to the package's default green
-        // color family (see GanttTheme.colorResolver /
-        // defaultGanttColorResolver) so every activity here reads as one
-        // consistent hue instead of an arbitrary color per row.
         data: const (
           status: DemoTaskStatus.inProgress,
           priority: DemoTaskPriority.high,
@@ -293,7 +305,6 @@ class _MyHomePageState extends State<MyHomePage> {
             start: now,
             end: now.add(const Duration(days: 5)),
             title: 'Subtask 2',
-            tooltip: 'WO-1001-2 | Subtask with nested children',
             dependsOn: const ['task1.sub1'],
             data: const (
               status: DemoTaskStatus.inProgress,
@@ -303,7 +314,6 @@ class _MyHomePageState extends State<MyHomePage> {
             actions: [
               GanttActivityAction(
                 icon: Icons.add,
-                tooltip: 'Add nested task',
                 onTap: () => debugPrint('Add nested to WO-1001-2'),
               ),
             ],
@@ -327,7 +337,6 @@ class _MyHomePageState extends State<MyHomePage> {
                 // other row, while the chart pane still shows the checkbox
                 // via titleWidget.
                 listTitle: 'Nested Subtask A',
-                tooltip: 'WO-1001-2A | Second-level task',
                 showCell: false,
                 data: const (
                   status: DemoTaskStatus.completed,
@@ -343,7 +352,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   label: 'Nested Subtask B',
                 ),
                 listTitle: 'Nested Subtask B',
-                tooltip: 'WO-1001-2B | Continued',
                 showCell: false,
                 data: const (
                   status: DemoTaskStatus.notStarted,
@@ -359,7 +367,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   label: 'Nested Subtask C',
                 ),
                 listTitle: 'Nested Subtask C',
-                tooltip: 'WO-1001-2B | Continued',
                 showCell: false,
                 data: const (
                   status: DemoTaskStatus.notStarted,
@@ -374,7 +381,6 @@ class _MyHomePageState extends State<MyHomePage> {
             start: now,
             end: now.add(const Duration(days: 5)),
             title: 'Subtask 3',
-            tooltip: 'WO-1001-2 | Subtask with nested children',
             dependsOn: const ['task1.sub1'],
             data: const (
               status: DemoTaskStatus.notStarted,
@@ -384,7 +390,6 @@ class _MyHomePageState extends State<MyHomePage> {
             actions: [
               GanttActivityAction(
                 icon: Icons.add,
-                tooltip: 'Add nested task',
                 onTap: () => debugPrint('Add nested to WO-1001-2'),
               ),
             ],
@@ -404,7 +409,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   label: 'Nested Subtask A3',
                 ),
                 listTitle: 'Nested Subtask A3',
-                tooltip: 'WO-1001-2A | Second-level task',
                 showCell: false,
                 data: const (
                   status: DemoTaskStatus.notStarted,
@@ -420,7 +424,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   label: 'Nested Subtask B3',
                 ),
                 listTitle: 'Nested Subtask B3',
-                tooltip: 'WO-1001-2B | Continued',
                 showCell: false,
                 data: const (
                   status: DemoTaskStatus.notStarted,
@@ -431,7 +434,13 @@ class _MyHomePageState extends State<MyHomePage> {
             ],
           ),
         ],
-      ),
+        // The app decides this Task's color itself (here, at random) and
+        // withColor propagates it to every descendant below — the default
+        // resolver lightens it further per depth, so the whole family
+        // still reads as one color that fades, not an unrelated hue per
+        // row. task2/task4 below each get their own random color the same
+        // way, to stand apart as their own color families.
+      ).withColor(_randomTaskColor()),
 
       // ✅ Standalone task near today
       GanttActivity(
@@ -439,13 +448,53 @@ class _MyHomePageState extends State<MyHomePage> {
         start: now.add(const Duration(days: 1)),
         end: now.add(const Duration(days: 8)),
         title: 'Independent Task',
-        tooltip: 'A separate task',
         data: const (
           status: DemoTaskStatus.inProgress,
           priority: DemoTaskPriority.medium,
           assignee: User('Nguyễn Văn A'),
         ),
-      ),
+        children: [
+          GanttActivity(
+            key: 'task2.sub1',
+            start: now.add(const Duration(days: 1)),
+            end: now.add(const Duration(days: 4)),
+            title: 'Subtask 2.1',
+            data: const (
+              status: DemoTaskStatus.inProgress,
+              priority: DemoTaskPriority.medium,
+              assignee: User('Nguyễn Văn A'),
+            ),
+            children: [
+              GanttActivity(
+                key: 'task2.sub1.subA',
+                start: now.add(const Duration(days: 2)),
+                end: now.add(const Duration(days: 3)),
+                titleWidget: const SubitemChecklistTitle(
+                  label: 'Nested Subtask 2.1A',
+                ),
+                listTitle: 'Nested Subtask 2.1A',
+                showCell: false,
+                data: const (
+                  status: DemoTaskStatus.notStarted,
+                  priority: null,
+                  assignee: User('Nguyễn Văn A'),
+                ),
+              ),
+            ],
+          ),
+          GanttActivity(
+            key: 'task2.sub2',
+            start: now.add(const Duration(days: 4)),
+            end: now.add(const Duration(days: 8)),
+            title: 'Subtask 2.2',
+            data: const (
+              status: DemoTaskStatus.notStarted,
+              priority: DemoTaskPriority.low,
+              assignee: User('Nguyễn Văn A'),
+            ),
+          ),
+        ],
+      ).withColor(_randomTaskColor()),
 
       // ✅ Activity a few days ago
       GanttActivity(
@@ -453,15 +502,13 @@ class _MyHomePageState extends State<MyHomePage> {
         start: now.subtract(const Duration(days: 10)),
         end: now.subtract(const Duration(days: 4)),
         title: 'Older Task',
-        tooltip: 'Past task',
         progress: 1.0,
         data: const (
           status: DemoTaskStatus.completed,
           priority: DemoTaskPriority.low,
           assignee: User('Nguyễn Văn A'),
         ),
-      ),
-
+      ).withColor(_randomTaskColor()),
     ];
   }
 
@@ -587,6 +634,77 @@ class _MyHomePageState extends State<MyHomePage> {
                 activitiesListFlex: 3,
                 gridAreaFlex: 4,
                 onColumnWidthsChanged: (ratios) => debugPrint('New ratios: $ratios'),
+                onPeekChildrenTap: (activity, position) {
+                  final children = activity.children ?? const [];
+                  if (children.isEmpty) return;
+                  // showMenu pushes its route on the app's root Navigator —
+                  // outside Gantt's own provider subtree — so a titleWidget
+                  // reading GanttTheme/GanttController via context (like
+                  // SubitemChecklistTitle does) can't find them there unless
+                  // re-provided here. Same fix the package's own drag-
+                  // feedback overlay uses (see SelectableBarGesture).
+                  showMenu<void>(
+                    context: context,
+                    position: RelativeRect.fromLTRB(
+                      position.dx,
+                      position.dy,
+                      position.dx,
+                      position.dy,
+                    ),
+                    // The app is in dark ThemeMode, but the chart itself is
+                    // styled light (GanttTheme) — an explicit light color/
+                    // shape here keeps the popup matching the chart it
+                    // popped out of, instead of the ambient dark Material
+                    // menu style clashing with it.
+                    color: Colors.white,
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(minWidth: 200),
+                    items: [
+                      for (final child in children)
+                        PopupMenuItem<void>(
+                          enabled: false,
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          // Reuses each child's own titleWidget (the
+                          // checkbox for a Subitem, same as ActivitiesList
+                          // shows it) rather than inventing separate popup
+                          // content — a quick peek at what's already there.
+                          // Theme.light overrides the app's own dark
+                          // ThemeMode just for this popup, so the Checkbox
+                          // (a Material widget, not GanttTheme-styled)
+                          // renders for a light background too.
+                          child: Theme(
+                            data: ThemeData.light(),
+                            child: MultiProvider(
+                              providers: [
+                                // GanttController extends ChangeNotifier —
+                                // plain Provider.value asserts against that
+                                // (it wouldn't know how to update
+                                // dependents), so this needs
+                                // ChangeNotifierProvider instead.
+                                ChangeNotifierProvider<GanttController>.value(
+                                  value: controller,
+                                ),
+                                Provider<GanttTheme>.value(
+                                  value: GanttTheme.of(
+                                    context,
+                                    todayLineColor: Colors.blue,
+                                    todayLineWidth: 2,
+                                  ),
+                                ),
+                              ],
+                              child:
+                                  child.titleWidget ??
+                                  Text(child.listTitle ?? child.title ?? ''),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
                 onActivityChanged: (activity, start, end) {
                   if (start != null && end != null) {
                     debugPrint('$activity was moved (Event on widget)');
@@ -616,6 +734,33 @@ class _MyHomePageState extends State<MyHomePage> {
                         descendant.end = descendant.end.add(
                           Duration(days: deltaDays),
                         );
+                      }
+                    }
+                  } else if (start != null) {
+                    // Resize of just the start edge: the package lets this
+                    // shrink past a descendant's own start (see
+                    // allowParentIndependentDateMovement) instead of
+                    // refusing the drag — so a Subitem left outside the
+                    // Subtask's new range gets pulled in to match here,
+                    // rather than rendering before/outside its own parent.
+                    for (final descendant
+                        in activity.children?.plainList ?? const []) {
+                      if (descendant.start.isBefore(start)) {
+                        descendant.start = start;
+                        if (descendant.end.isBefore(descendant.start)) {
+                          descendant.end = descendant.start;
+                        }
+                      }
+                    }
+                  } else if (end != null) {
+                    // Same as above, for the end edge.
+                    for (final descendant
+                        in activity.children?.plainList ?? const []) {
+                      if (descendant.end.isAfter(end)) {
+                        descendant.end = end;
+                        if (descendant.start.isAfter(descendant.end)) {
+                          descendant.start = descendant.end;
+                        }
                       }
                     }
                   }

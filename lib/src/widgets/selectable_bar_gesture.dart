@@ -107,10 +107,14 @@ class _SelectableBarGestureState extends State<SelectableBarGesture> {
                 activity.validMoveToParent(daysDeltaTemp)),
       _DragMode.resizeStart =>
         ctrl.cellVisibleDays - daysDeltaTemp > 0 &&
-            activity.validStartMove(daysDeltaTemp),
+            (activity.validStartMove(daysDeltaTemp) ||
+                (_controller.allowParentIndependentDateMovement &&
+                    activity.validStartMoveIgnoringChildren(daysDeltaTemp))),
       _DragMode.resizeEnd =>
         ctrl.cellVisibleDays + daysDeltaTemp > 0 &&
-            activity.validEndMove(daysDeltaTemp),
+            (activity.validEndMove(daysDeltaTemp) ||
+                (_controller.allowParentIndependentDateMovement &&
+                    activity.validEndMoveIgnoringChildren(daysDeltaTemp))),
     };
     if (valid) {
       setState(() => _daysDelta = daysDeltaTemp);

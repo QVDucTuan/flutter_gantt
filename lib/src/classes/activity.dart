@@ -82,7 +82,9 @@ class GanttActivity<T> {
   /// An index into a consumer-supplied color palette.
   ///
   /// Only consulted by a [GanttTheme.colorResolver] a consumer supplies —
-  /// this package has no built-in palette.
+  /// this package has no built-in palette. To let the app pick each Task's
+  /// actual color itself (e.g. randomly), set [color] instead — see
+  /// [withColor].
   final int? colorIndex;
 
   /// The [key]s of activities this one depends on (predecessors).
@@ -309,6 +311,25 @@ class GanttActivity<T> {
     limitEnd: limitEnd == _unset ? this.limitEnd : limitEnd as DateTime?,
   );
 
+  /// Returns a copy of this activity and every descendant with [color] set
+  /// throughout, so a whole Task family shares one base color without
+  /// hand-setting it node by node. The default [GanttTheme.colorResolver]
+  /// (`defaultGanttColorResolver`) uses it verbatim at this activity's own
+  /// depth and lightens it further for each deeper descendant — so the app
+  /// only has to decide *one* color per Task (e.g. at random) and the whole
+  /// family still reads as that one color fading with depth.
+  ///
+  /// ```dart
+  /// // App decides the color itself — e.g. randomly, one per Task:
+  /// activities = [
+  ///   for (final task in tasks) task.withColor(randomColor()),
+  /// ];
+  /// ```
+  GanttActivity<T> withColor(Color color) => copyWith(
+    color: color,
+    children: children?.map((c) => c.withColor(color)).toList(),
+  );
+
   /// The duration of the activity in days.
   int get daysDuration => end.diffInDays(start) + 1;
 
@@ -360,6 +381,22 @@ class GanttActivity<T> {
       (limitEnd == null || end.addDays(days).isBeforeOrSame(limitEnd!));
 
   bool validMove(int days) => validStartMove(days) && validEndMove(days);
+
+  /// Same as [validStartMove], minus the [validStartMoveToChildren] check —
+  /// the resize-equivalent of [validMoveToParent], for a consumer that
+  /// handles reconciling children with the new range itself (e.g. clamping
+  /// a Subitem's date to stay inside its resized Subtask — see
+  /// [GanttController.allowParentIndependentDateMovement]) instead of
+  /// having the resize simply refuse to shrink past one.
+  bool validStartMoveIgnoringChildren(int days) =>
+      validStartMoveToParent(days) &&
+      (limitStart == null || start.addDays(days).isAfterOrSame(limitStart!));
+
+  /// Same as [validEndMove], minus the [validEndMoveToChildren] check — see
+  /// [validStartMoveIgnoringChildren].
+  bool validEndMoveIgnoringChildren(int days) =>
+      validEndMoveToParent(days) &&
+      (limitEnd == null || end.addDays(days).isBeforeOrSame(limitEnd!));
 }
 
 /// Extension methods for working with lists of [GanttActivity].
