@@ -14,6 +14,13 @@ class GanttListColumn {
   /// Defaults to `1` if both are unset.
   final int? flex;
 
+  /// The narrowest this column can be dragged to via `ActivitiesList`'s
+  /// header resize handle — dragging a boundary stops right at this width
+  /// instead of shrinking the column further. Only applies to a flex-based
+  /// column (one with [width] unset); a fixed-[width] column isn't
+  /// draggable at all. Defaults to 40.0.
+  final double minWidth;
+
   /// Builds this column's cell content for a given activity.
   final Widget Function(BuildContext context, GanttActivity activity)
   cellBuilder;
@@ -30,6 +37,7 @@ class GanttListColumn {
     required this.cellBuilder,
     this.width,
     this.flex,
+    this.minWidth = 40.0,
     this.sortValue,
   });
 }

@@ -567,7 +567,9 @@ class _MyHomePageState extends State<MyHomePage> {
                           activity.listTitle ?? activity.title ?? '',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: context.watch<GanttTheme>().textStyle(),
+                          style: context.watch<GanttTheme>().textStyle(
+                            weight: ganttNameWeightForDepth(activity.depth),
+                          ),
                         ),
                   ),
                   GanttListColumn(

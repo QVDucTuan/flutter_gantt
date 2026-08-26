@@ -94,11 +94,59 @@ class ActivitiesList extends StatefulWidget {
 }
 
 class _ActivitiesListState extends State<ActivitiesList> {
-  static const double _minColumnWidth = 40.0;
   static const double _dividerWidth = 1.0;
   // Short centered tick, not a wall-to-wall divider — each data row draws
   // its own, matching QV's per-row style instead of one continuous line.
   static const double _columnDividerTickHeight = 20.0;
+
+  // Column 0 (the tree/name column) always renders this chrome ahead of its
+  // own cellBuilder content — see [_columnContent] and [_buildExpandToggle]
+  // — none of it can shrink below these sizes, so they're the same literal
+  // numbers used there, duplicated here only for computing a minimum.
+  static const double _expandToggleWidth = 20.0;
+  static const double _depthIconWidth = 16.0; // 12px icon + 4px trailing gap
+  static const double _column0HorizontalPadding = 8.0; // horizontal: 4 * 2
+
+  /// The deepest nesting level anywhere in [activities] (0 for a flat
+  /// list), including collapsed subtrees — a row hidden today by a collapsed
+  /// ancestor can still be revealed later without the column suddenly being
+  /// too narrow for it.
+  int _maxDepth(List<GanttActivity> activities) {
+    var deepest = 0;
+    for (final activity in activities) {
+      if (activity.depth > deepest) deepest = activity.depth;
+      final children = activity.children;
+      if (children != null && children.isNotEmpty) {
+        final childDeepest = _maxDepth(children);
+        if (childDeepest > deepest) deepest = childDeepest;
+      }
+    }
+    return deepest;
+  }
+
+  /// The narrowest column [index] can be resized to. For every column but
+  /// the first this is just [GanttListColumn.minWidth]. Column 0 also has
+  /// to fit [GanttTreeIndent] at the tree's own deepest level plus the
+  /// fixed-size expand toggle and depth icon (see [_columnContent]) ahead
+  /// of its content — none of that can shrink, so a flat [minWidth] alone
+  /// (its default, 40.0, comfortably covers every *other* column) isn't
+  /// enough once nesting goes any deeper than trivial: at depth 0 the
+  /// chrome alone is already ~58px, more before any of the row's own text.
+  /// Ignoring this is exactly what let column 0 get dragged narrower than
+  /// its own content, overflowing every row's [Row] by however many pixels
+  /// its indent exceeded the available space.
+  double _effectiveMinWidth(int index, GanttTheme theme) {
+    final column = widget.columns![index];
+    if (index != 0) return column.minWidth;
+    final deepestIndent =
+        theme.treeIndentWidth * (_maxDepth(widget.activities) + 1);
+    final chrome =
+        deepestIndent +
+        _expandToggleWidth +
+        (theme.depthIconBuilder != null ? _depthIconWidth : 0) +
+        _column0HorizontalPadding;
+    return chrome > column.minWidth ? chrome : column.minWidth;
+  }
 
   /// Each flex-based column's share of the *flexible* space (total width
   /// minus any fixed-`width` columns and the dividers between them) — always
@@ -160,27 +208,48 @@ class _ActivitiesListState extends State<ActivitiesList> {
   /// resizing one column always borrows/gives space to its neighbor instead
   /// of changing the row's total width. [flexSpace] is this build's current
   /// flexible space (see [_flexSpace]) — needed to convert the drag's pixel
-  /// delta into a ratio delta, and to convert [_minColumnWidth] into an
-  /// equivalent minimum ratio.
-  void _resizeBoundary(int index, double dx, double flexSpace) {
+  /// delta into a ratio delta, and to convert each column's own effective
+  /// minimum (see [_effectiveMinWidth] — column 0's accounts for the tree's
+  /// own deepest indent, not just its configured [GanttListColumn.minWidth])
+  /// into an equivalent minimum ratio.
+  ///
+  /// The pair's combined ratio (`ratios[index] + ratios[next]`) never
+  /// changes — only how it's split between them — so [index]'s valid range
+  /// is clamped to `[its own minRatio, combined - next's minRatio]` in one
+  /// step. That's deliberate: a plain `dx.clamp(minRatio, ...)` on [index]
+  /// alone, followed by rejecting the whole update if [next] would end up
+  /// under its min, "catches" correctly only while every pointer-move event
+  /// carries a small delta — a single large one (a fast drag, or a
+  /// synthetic big jump) would overshoot [next]'s min in one step and get
+  /// rejected outright, freezing the handle short of the min instead of
+  /// snapping to it. Deriving the range from the combined total instead
+  /// means any delta, large or small, lands exactly at whichever column's
+  /// min it would have crossed.
+  void _resizeBoundary(int index, double dx, double flexSpace, GanttTheme theme) {
     final ratios = _columnRatios;
     if (ratios == null || flexSpace <= 0) return;
     final next = index + 1;
     if (next >= ratios.length) return;
+    final columns = widget.columns!;
     // Fixed-width columns don't have a meaningful ratio to drag.
-    if (widget.columns![index].width != null ||
-        widget.columns![next].width != null) {
+    if (columns[index].width != null || columns[next].width != null) {
       return;
     }
-    final minRatio = _minColumnWidth / flexSpace;
+    final currentMinRatio = _effectiveMinWidth(index, theme) / flexSpace;
+    final nextMinRatio = _effectiveMinWidth(next, theme) / flexSpace;
+    final combined = ratios[index] + ratios[next];
+    final maxCurrentRatio = combined - nextMinRatio;
+    // Not enough combined space for both columns' minimums (e.g. the window
+    // just got a lot narrower) — nothing sane to do until that changes.
+    if (maxCurrentRatio < currentMinRatio) return;
     final ratioDelta = dx / flexSpace;
-    final newCurrent = (ratios[index] + ratioDelta).clamp(minRatio, 1.0);
-    final actualDelta = newCurrent - ratios[index];
-    final newNext = ratios[next] - actualDelta;
-    if (newNext < minRatio) return;
+    final newCurrent = (ratios[index] + ratioDelta).clamp(
+      currentMinRatio,
+      maxCurrentRatio,
+    );
     setState(() {
       ratios[index] = newCurrent;
-      ratios[next] = newNext;
+      ratios[next] = combined - newCurrent;
     });
   }
 
@@ -305,7 +374,7 @@ class _ActivitiesListState extends State<ActivitiesList> {
                 activity.listTitle ?? activity.title!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textStyle(weight: _nameWeightForDepth(activity.depth)),
+                style: theme.textStyle(weight: ganttNameWeightForDepth(activity.depth)),
               ),
             ),
       ),
@@ -400,20 +469,37 @@ class _ActivitiesListState extends State<ActivitiesList> {
     final handles = <Widget>[];
     var x = 0.0;
     for (var i = 0; i < columns.length; i++) {
+      // Only the first column (the tree/name column every row indents
+      // under) gets the depth-0 icon — it's the one column whose data rows
+      // already carry a depth icon (see [_columnContent]), so the header
+      // echoes it instead of showing a bare label.
+      final headerIcon = i == 0 ? theme.depthIconBuilder?.call(0) : null;
       cells.add(
         SizedBox(
           width: widths[i],
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              columns[i].header,
-              // A couple points larger than a cell's own text — visually
-              // sets the column titles apart from the rows underneath.
-              style: theme.textStyle(
-                size: theme.fontSize + 2,
-                weight: FontWeight.w600,
-              ),
-              overflow: TextOverflow.ellipsis,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                if (headerIcon != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: headerIcon,
+                  ),
+                Expanded(
+                  child: Text(
+                    columns[i].header,
+                    // A couple points larger than a cell's own text —
+                    // visually sets the column titles apart from the rows
+                    // underneath.
+                    style: theme.textStyle(
+                      size: theme.fontSize + 2,
+                      weight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -441,7 +527,7 @@ class _ActivitiesListState extends State<ActivitiesList> {
             bottom: 0,
             width: 8,
             child: _ColumnResizeHandle(
-              onDrag: (dx) => _resizeBoundary(boundaryIndex, dx, flexSpace),
+              onDrag: (dx) => _resizeBoundary(boundaryIndex, dx, flexSpace, theme),
               onDragEnd: _notifyColumnWidthsChanged,
             ),
           ),
@@ -451,14 +537,6 @@ class _ActivitiesListState extends State<ActivitiesList> {
     }
     return Stack(children: [Row(children: cells), ...handles]);
   }
-
-  /// Matches QV's row-name weight scale: 600 at depth 0, 500 at depth 1,
-  /// 400 at depth 2+.
-  static FontWeight _nameWeightForDepth(int depth) => switch (depth) {
-    0 => FontWeight.w600,
-    1 => FontWeight.w500,
-    _ => FontWeight.w400,
-  };
 
   @override
   Widget build(BuildContext context) => Consumer<GanttTheme>(

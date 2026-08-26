@@ -107,6 +107,18 @@ Widget? defaultGanttDepthIcon(int depth) {
   return SvgPicture.asset(asset, width: 12, height: 12);
 }
 
+/// The package's own per-depth boldness for a row's name text — 600 at
+/// depth 0, 500 at depth 1, 400 at depth 2+ (matches QV Agent Hub's row-name
+/// weight scale). `ActivitiesList`'s built-in name column uses this
+/// automatically; exposed here so a consumer's own `cellBuilder` for a
+/// custom name column (see [GanttListColumn]) can match it too instead of
+/// rendering every depth at the same weight.
+FontWeight ganttNameWeightForDepth(int depth) => switch (depth) {
+  0 => FontWeight.w600,
+  1 => FontWeight.w500,
+  _ => FontWeight.w400,
+};
+
 /// A customizable theme for Gantt chart widgets.
 ///
 /// Provides styling options for various elements of the Gantt chart,
