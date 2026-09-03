@@ -305,7 +305,10 @@ class _MyHomePageState extends State<MyHomePage> {
       GanttActivity(
         key: 'task1',
         start: now.subtract(const Duration(days: 3)),
-        end: now.add(const Duration(days: 6)),
+        // Widened from +6 to fit Subtask 2/4/3 laid out sequentially below
+        // (each starting exactly when the previous ends) instead of the
+        // three of them fully overlapping — see their own comments.
+        end: now.add(const Duration(days: 15)),
         title: 'Main Task',
         data: const (
           status: DemoTaskStatus.inProgress,
@@ -421,9 +424,92 @@ class _MyHomePageState extends State<MyHomePage> {
             ],
           ),
           GanttActivity(
+            key: 'task1.sub4',
+            // Starts exactly when Subtask 2 ends — sequential, not
+            // overlapping, like Subtask 3 below it.
+            start: now.add(const Duration(days: 5)),
+            end: now.add(const Duration(days: 10)),
+            title: 'Subtask 4',
+            data: const (
+              status: DemoTaskStatus.inProgress,
+              priority: DemoTaskPriority.medium,
+              assignee: User('Nguyễn Văn A'),
+            ),
+            actions: [
+              GanttActivityAction(
+                icon: Icons.add,
+                onTap: () => debugPrint('Add nested to WO-1001-2'),
+              ),
+            ],
+            children: [
+              // Subitems (2nd-level nesting) render as a checklist row —
+              // checkbox + name, no date bar — not a scaled-down copy of
+              // the Task/Subtask bar. showCell: false stops GanttActivityRow
+              // from mounting any drag gesture for it (structurally, not
+              // just visually), and titleWidget supplies the checkbox+name;
+              // the tree connector line ahead of it still comes from
+              // ActivitiesList's own indent, unaffected by titleWidget.
+              GanttActivity(
+                key: 'task1.sub4.subA',
+                start: now.add(const Duration(days: 6)),
+                end: now.add(const Duration(days: 8)),
+                titleWidget: const SubitemChecklistTitle(
+                  label: 'Nested Subtask A4',
+                ),
+                // Only consulted by the demo's own list-column cellBuilders
+                // below — lets the list pane(s) show plain text like every
+                // other row, while the chart pane still shows the checkbox
+                // via titleWidget.
+                listTitle: 'Nested Subtask A4',
+                showCell: false,
+                data: const (
+                  status: DemoTaskStatus.completed,
+                  priority: null,
+                  assignee: User('Nguyễn Văn A'),
+                ),
+              ),
+              GanttActivity(
+                key: 'task1.sub4.subB',
+                start: now.add(const Duration(days: 7)),
+                end: now.add(const Duration(days: 9)),
+                titleWidget: const SubitemChecklistTitle(
+                  label: 'Nested Subtask B4',
+                ),
+                listTitle: 'Nested Subtask B4',
+                showCell: false,
+                data: const (
+                  status: DemoTaskStatus.notStarted,
+                  priority: null,
+                  assignee: User('Nguyễn Văn A'),
+                ),
+              ),
+              GanttActivity(
+                key: 'task1.sub4.subC',
+                start: now.add(const Duration(days: 7)),
+                end: now.add(const Duration(days: 9)),
+                titleWidget: const SubitemChecklistTitle(
+                  label: 'Nested Subtask C4',
+                ),
+                listTitle: 'Nested Subtask C4',
+                showCell: false,
+                data: const (
+                  status: DemoTaskStatus.notStarted,
+                  priority: null,
+                  assignee: User('Nguyễn Văn A'),
+                ),
+              ),
+            ],
+          ),
+          GanttActivity(
             key: 'task1.sub3',
-            start: now,
-            end: now.add(const Duration(days: 5)),
+            // Starts exactly when Subtask 4 ends — sequential, not
+            // overlapping. Was `now`/`now+5`, fully overlapping Subtask 2 —
+            // which is exactly why the dependsOn arrow below used to draw a
+            // backwards/degenerate elbow instead of a clean forward one:
+            // the arrow's math assumes the source (Subtask 2) finishes
+            // before the target (this) starts, same as QV's own.
+            start: now.add(const Duration(days: 10)),
+            end: now.add(const Duration(days: 15)),
             title: 'Subtask 3',
             // Was 'task1.sub1' — an activity that got commented out above,
             // so this dependency silently never drew (DependencyArrows
@@ -451,8 +537,8 @@ class _MyHomePageState extends State<MyHomePage> {
               // ActivitiesList's own indent, unaffected by titleWidget.
               GanttActivity(
                 key: 'task1.sub3.subA',
-                start: now.add(const Duration(days: 1)),
-                end: now.add(const Duration(days: 3)),
+                start: now.add(const Duration(days: 11)),
+                end: now.add(const Duration(days: 13)),
                 titleWidget: const SubitemChecklistTitle(
                   label: 'Nested Subtask A3',
                 ),
@@ -466,8 +552,8 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               GanttActivity(
                 key: 'task1.sub3.subB',
-                start: now.add(const Duration(days: 2)),
-                end: now.add(const Duration(days: 4)),
+                start: now.add(const Duration(days: 12)),
+                end: now.add(const Duration(days: 14)),
                 titleWidget: const SubitemChecklistTitle(
                   label: 'Nested Subtask B3',
                 ),

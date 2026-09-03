@@ -139,6 +139,13 @@ class _DependencyArrowsPainter extends CustomPainter {
     required this.strokeWidth,
   });
 
+  // How far the connector always pulls out from the source's own edge
+  // before turning, regardless of where the target ends up — even when the
+  // target sits behind this point (source/target overlap in time), so the
+  // rail stays a short, fixed stub off the source rather than sliding back
+  // and forth with an every-pair-different midpoint.
+  static const double _leadOutDistance = 10.0;
+
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint =
@@ -152,22 +159,28 @@ class _DependencyArrowsPainter extends CustomPainter {
           ..style = PaintingStyle.fill;
 
     for (final arrow in arrows) {
-      final midX = (arrow.startX + arrow.endX) / 2;
+      final railX = arrow.startX + _leadOutDistance;
       final path =
           Path()
             ..moveTo(arrow.startX, arrow.startY)
-            ..lineTo(midX, arrow.startY)
-            ..lineTo(midX, arrow.endY)
+            ..lineTo(railX, arrow.startY)
+            ..lineTo(railX, arrow.endY)
             ..lineTo(arrow.endX, arrow.endY);
       canvas.drawPath(path, linePaint);
 
       const headSize = 5.0;
       final tip = Offset(arrow.endX, arrow.endY);
+      // Points whichever way the final horizontal segment actually
+      // travels — left-to-right in the common case, but right-to-left
+      // when the rail lands to the right of the target (source and target
+      // overlap in time, see _leadOutDistance).
+      final approachingFromLeft = railX <= arrow.endX;
+      final backX = approachingFromLeft ? tip.dx - headSize : tip.dx + headSize;
       final head =
           Path()
             ..moveTo(tip.dx, tip.dy)
-            ..lineTo(tip.dx - headSize, tip.dy - headSize)
-            ..lineTo(tip.dx - headSize, tip.dy + headSize)
+            ..lineTo(backX, tip.dy - headSize)
+            ..lineTo(backX, tip.dy + headSize)
             ..close();
       canvas.drawPath(head, headPaint);
     }

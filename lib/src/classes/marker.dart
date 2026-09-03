@@ -21,7 +21,9 @@ class GanttMarker {
   /// The [GanttActivity.key] of the row this marker is positioned against.
   final String activityKey;
 
-  /// A custom icon widget. Defaults to a small diamond glyph if unset.
+  /// A custom icon widget. Defaults to the package's bundled flag-pin glyph
+  /// (`assets/icons/ico_marker.svg`, tinted with [GanttTheme.todayBackgroundColor])
+  /// if unset.
   final Widget? icon;
 
   /// Optional tooltip text.

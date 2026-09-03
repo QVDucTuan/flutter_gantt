@@ -1,6 +1,5 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../classes/activity.dart';
@@ -52,7 +51,10 @@ class MarkersOverlay extends StatelessWidget {
     final all = activities.plainList;
     final headerOffset = headerOffsetFor(theme, showIsoWeek);
 
-    const glyphSize = 14.0;
+    // Matches the bundled SVG's own native size (see
+    // assets/icons/ico_marker.svg's width/height/viewBox) instead of
+    // stretching it to an arbitrary one.
+    const glyphSize = 18.0;
     final glyphs = <Widget>[];
     for (final marker in controller.markers) {
       if (!marker.date.isDateBetween(
@@ -79,7 +81,7 @@ class MarkersOverlay extends StatelessWidget {
             message: marker.tooltip ?? '',
             child: GestureDetector(
               onTap: marker.onTap,
-              child: marker.icon ?? _defaultMarkerIcon(theme, glyphSize),
+              child: marker.icon ?? _defaultMarkerIcon(glyphSize),
             ),
           ),
         ),
@@ -106,14 +108,13 @@ class MarkersOverlay extends StatelessWidget {
   }
 }
 
-Widget _defaultMarkerIcon(GanttTheme theme, double size) => Transform.rotate(
-  angle: math.pi / 4,
-  child: Container(
-    width: size * 0.7,
-    height: size * 0.7,
-    decoration: BoxDecoration(
-      color: theme.todayBackgroundColor,
-      border: Border.all(color: Colors.white, width: 1.5),
-    ),
-  ),
-);
+// Bundled with the package itself (assets/icons/ico_marker.svg), so the
+// packages/flutter_gantt/ prefix is required for SvgPicture.asset to
+// resolve it from a consuming app — same as the depth icons.
+const String _defaultMarkerIconAsset =
+    'packages/flutter_gantt/assets/icons/ico_marker.svg';
+
+// No colorFilter — renders with the SVG's own authored color (its `stroke`
+// value) as-is, rather than tinting it to match the theme.
+Widget _defaultMarkerIcon(double size) =>
+    SvgPicture.asset(_defaultMarkerIconAsset, width: size, height: size);

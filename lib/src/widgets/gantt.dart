@@ -680,12 +680,15 @@ class _GanttState extends State<Gantt> {
                                       _gridColumnsController,
                                   showIsoWeek: widget.showIsoWeek,
                                 ),
-                              ActivitiesGrid(
-                                key: _activitiesGridKey,
-                                activities: c.activities,
-                                controller: _gridColumnsController,
-                                showIsoWeek: widget.showIsoWeek,
-                              ),
+                              // Painted *before* ActivitiesGrid (below it in
+                              // the stack) on purpose: a bar is opaque, so
+                              // wherever an arrow's path runs underneath one
+                              // (most visibly the last stretch running into
+                              // its target), the bar's own fill naturally
+                              // occludes that segment instead of the line
+                              // showing through on top of it — the
+                              // connection itself is unaffected, this only
+                              // changes what's drawn over what.
                               if (c.isScrollMode)
                                 DependencyArrows(
                                   activities: c.activities,
@@ -693,6 +696,12 @@ class _GanttState extends State<Gantt> {
                                       _gridColumnsController,
                                   showIsoWeek: widget.showIsoWeek,
                                 ),
+                              ActivitiesGrid(
+                                key: _activitiesGridKey,
+                                activities: c.activities,
+                                controller: _gridColumnsController,
+                                showIsoWeek: widget.showIsoWeek,
+                              ),
                               MarkersOverlay(
                                 activities: c.activities,
                                 verticalScrollController:
