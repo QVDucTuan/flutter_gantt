@@ -96,7 +96,9 @@ class ActivitiesList extends StatefulWidget {
 class _ActivitiesListState extends State<ActivitiesList> {
   static const double _dividerWidth = 1.0;
   // Short centered tick, not a wall-to-wall divider — each data row draws
-  // its own, matching QV's per-row style instead of one continuous line.
+  // its own, so consecutive rows read as one continuous rail when flush,
+  // but a gap between rows (e.g. a group boundary) breaks it cleanly there
+  // instead of a single line cutting straight across the gap.
   static const double _columnDividerTickHeight = 20.0;
 
   // Column 0 (the tree/name column) always renders this chrome ahead of its
@@ -195,7 +197,10 @@ class _ActivitiesListState extends State<ActivitiesList> {
 
   /// Resolves each column's actual pixel width for the current build, from
   /// its stored ratio (or its own fixed `width`) and [totalWidth].
-  List<double> _resolveWidths(List<GanttListColumn> columns, double totalWidth) {
+  List<double> _resolveWidths(
+    List<GanttListColumn> columns,
+    double totalWidth,
+  ) {
     final flexSpace = _flexSpace(columns, totalWidth);
     final ratios = _columnRatios!;
     return [
@@ -225,7 +230,12 @@ class _ActivitiesListState extends State<ActivitiesList> {
   /// snapping to it. Deriving the range from the combined total instead
   /// means any delta, large or small, lands exactly at whichever column's
   /// min it would have crossed.
-  void _resizeBoundary(int index, double dx, double flexSpace, GanttTheme theme) {
+  void _resizeBoundary(
+    int index,
+    double dx,
+    double flexSpace,
+    GanttTheme theme,
+  ) {
     final ratios = _columnRatios;
     if (ratios == null || flexSpace <= 0) return;
     final next = index + 1;
@@ -374,7 +384,9 @@ class _ActivitiesListState extends State<ActivitiesList> {
                 activity.listTitle ?? activity.title!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textStyle(weight: ganttNameWeightForDepth(activity.depth)),
+                style: theme.textStyle(
+                  weight: theme.nameWeightForDepth?.call(activity.depth),
+                ),
               ),
             ),
       ),
@@ -527,7 +539,8 @@ class _ActivitiesListState extends State<ActivitiesList> {
             bottom: 0,
             width: 8,
             child: _ColumnResizeHandle(
-              onDrag: (dx) => _resizeBoundary(boundaryIndex, dx, flexSpace, theme),
+              onDrag:
+                  (dx) => _resizeBoundary(boundaryIndex, dx, flexSpace, theme),
               onDragEnd: _notifyColumnWidthsChanged,
             ),
           ),
@@ -562,8 +575,7 @@ class _ActivitiesListState extends State<ActivitiesList> {
                 // `headerHeight + 1`, pushing this pane's rows a pixel
                 // below where the calendar's bars actually start.
                 height:
-                    theme.headerHeight +
-                    (widget.showIsoWeek ? 10 : 0) -
+                    headerOffsetFor(theme, widget.showIsoWeek) -
                     (columns != null ? 1 : 0),
                 child:
                     widths != null

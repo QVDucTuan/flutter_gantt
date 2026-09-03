@@ -79,9 +79,7 @@ class ActivitiesGrid extends StatelessWidget {
     builder: (context, theme, child) {
       final controller = context.watch<GanttController>();
       return Padding(
-        padding: EdgeInsets.only(
-          top: theme.headerHeight + (showIsoWeek ? 10 : 0),
-        ),
+        padding: EdgeInsets.only(top: headerOffsetFor(theme, showIsoWeek)),
         child: ListView(
           controller: this.controller,
           children: getItems(activities, theme, controller),

@@ -4,6 +4,7 @@ import 'package:linked_scroll_controller/linked_scroll_controller.dart';
 import 'package:provider/provider.dart';
 
 import '../../flutter_gantt.dart';
+import '../utils/row_geometry.dart';
 import 'activities_grid.dart';
 import 'activities_list.dart';
 import 'calendar_grid.dart';
@@ -95,7 +96,8 @@ class Gantt extends StatefulWidget {
   /// dates — since neither a move nor a resize adjusts children on its own,
   /// requiring them to stay inside the new window would make any activity
   /// with children effectively un-draggable/un-resizable past them.
-  /// Defaults to `true`.
+  /// Defaults to `false` (a parent is constrained by its children's current
+  /// dates too, same as before this option existed).
   ///
   /// With this on, use [onActivityChanged] to reconcile children yourself —
   /// e.g. shift every descendant by the same delta on a move, or clamp a
@@ -214,7 +216,7 @@ class Gantt extends StatefulWidget {
   final void Function(List<double> ratios)? onColumnWidthsChanged;
 
   /// The drag/resize interaction bars use.
-  /// Defaults to [GanttInteractionMode.selectableDrag].
+  /// Defaults to [GanttInteractionMode.longPressDrag].
   final GanttInteractionMode interactionMode;
 
   /// A callback used to convert a [DateTime] value into a textual
@@ -258,7 +260,7 @@ class Gantt extends StatefulWidget {
     this.onActivityChanged,
     this.highlightedDates,
     this.enableDraggable = true,
-    this.allowParentIndependentDateMovement = true,
+    this.allowParentIndependentDateMovement = false,
     this.activitiesListFlex = 1,
     this.gridAreaFlex = 4,
     this.showIsoWeek = false,
@@ -269,7 +271,7 @@ class Gantt extends StatefulWidget {
     this.initialColumnWidths,
     this.onColumnWidthsChanged,
     this.listColumns,
-    this.interactionMode = GanttInteractionMode.selectableDrag,
+    this.interactionMode = GanttInteractionMode.longPressDrag,
     this.monthToText,
     this.centerOnToday = true,
     this.centerOnSelection = true,
@@ -586,7 +588,8 @@ class _GanttState extends State<Gantt> {
         _measuredHeaderHeight != null
             ? theme.copyWith(
               headerHeight:
-                  _measuredHeaderHeight! - (widget.showIsoWeek ? 10 : 0),
+                  _measuredHeaderHeight! -
+                  (widget.showIsoWeek ? theme.weekRowHeight : 0),
             )
             : theme;
     return MultiProvider(
@@ -596,13 +599,20 @@ class _GanttState extends State<Gantt> {
       ],
       builder: (context, child) {
         final c = context.watch<GanttController>();
+        final borderRadius = theme.chartBorderRadius;
         return Container(
           decoration: BoxDecoration(
             color: theme.backgroundColor,
-            border: Border.all(color: theme.dividerColor),
-            borderRadius: BorderRadius.circular(8),
+            border:
+                borderRadius != null
+                    ? Border.all(color: theme.dividerColor)
+                    : null,
+            borderRadius:
+                borderRadius != null
+                    ? BorderRadius.circular(borderRadius)
+                    : null,
           ),
-          clipBehavior: Clip.antiAlias,
+          clipBehavior: borderRadius != null ? Clip.antiAlias : Clip.none,
           child: Column(
             children: [
               SizedBox(
@@ -646,8 +656,10 @@ class _GanttState extends State<Gantt> {
                               // list's own column header.
                               Positioned(
                                 top:
-                                    effectiveTheme.headerHeight +
-                                    (widget.showIsoWeek ? 10 : 0) -
+                                    headerOffsetFor(
+                                      effectiveTheme,
+                                      widget.showIsoWeek,
+                                    ) -
                                     1,
                                 left: 0,
                                 right: 0,

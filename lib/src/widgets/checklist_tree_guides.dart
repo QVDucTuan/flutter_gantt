@@ -48,7 +48,7 @@ class ChecklistTreeGuides extends StatelessWidget {
       theme,
       isCollapsed: controller.isCollapsed,
     );
-    final headerOffset = theme.headerHeight + (showIsoWeek ? 10 : 0);
+    final headerOffset = headerOffsetFor(theme, showIsoWeek);
 
     return IgnorePointer(
       child: BelowHeaderClip(
@@ -117,8 +117,7 @@ class _ChecklistGuidesPainter extends CustomPainter {
       for (final activity in items) {
         final children = activity.children;
         if (children != null && children.isNotEmpty) {
-          final checklistChildren =
-              children.where((c) => !c.showCell).toList();
+          final checklistChildren = children.where((c) => !c.showCell).toList();
           if (checklistChildren.isNotEmpty) {
             final spaceBefore = _spaceBeforeFor(activity);
             var previousGeo = geometry[activity.key];

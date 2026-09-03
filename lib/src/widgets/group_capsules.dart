@@ -46,7 +46,7 @@ class GanttGroupCapsules extends StatelessWidget {
       theme,
       isCollapsed: controller.isCollapsed,
     );
-    final headerOffset = theme.headerHeight + (showIsoWeek ? 10 : 0);
+    final headerOffset = headerOffsetFor(theme, showIsoWeek);
 
     final capsules = <_CapsuleSpec>[];
 
@@ -81,7 +81,8 @@ class GanttGroupCapsules extends StatelessWidget {
             // so hugging the raw row bounds left a visibly bigger gap on
             // top/bottom than groupCapsuleHorizontalPadding leaves on the
             // sides. Checklist rows (showCell false) have no such inset.
-            final barInset = descendant.showCell ? theme.barVerticalPadding : 0.0;
+            final barInset =
+                descendant.showCell ? theme.barVerticalPadding : 0.0;
             final rowTop = rowGeometry.top + barInset;
             final rowBottom = rowGeometry.top + rowGeometry.height - barInset;
             if (top == null || rowTop < top) {
@@ -196,9 +197,9 @@ BoxDecoration _defaultCapsuleStyle(
 ) {
   // Wash tinted with this activity's own bar color (the same one
   // GanttCell resolves), not an unrelated fixed color — so the capsule
-  // reads as "this activity's own group," matching QV's own washes.
+  // reads as "this activity's own group."
   final barColor =
-      theme.colorResolver?.call(depth, activity.colorIndex, activity.color) ??
+      theme.colorResolver?.call(activity) ??
       activity.color ??
       theme.defaultCellColor;
   return BoxDecoration(

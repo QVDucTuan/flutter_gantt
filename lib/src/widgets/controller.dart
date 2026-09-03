@@ -43,11 +43,11 @@ class GanttController extends ChangeNotifier {
   double gridWidth = 0;
   List<DateTime> _highlightedDates = [];
   bool _enableDraggable = true;
-  bool _allowParentIndependentDateMovement = true;
+  bool _allowParentIndependentDateMovement = false;
   Duration _dragStartDelay;
   double? _fixedDayWidth = _defaultFixedDayWidth;
   ScrollController? _horizontalScrollController;
-  GanttInteractionMode _interactionMode = GanttInteractionMode.selectableDrag;
+  GanttInteractionMode _interactionMode = GanttInteractionMode.longPressDrag;
   String? _selectedActivityKey;
   final Set<String> _collapsedKeys = {};
   String? _hoveredActivityKey;
@@ -329,7 +329,9 @@ class GanttController extends ChangeNotifier {
 
   void _shift({required int days, bool fetchData = true}) {
     final scrollController = _horizontalScrollController;
-    if (isScrollMode && scrollController != null && scrollController.hasClients) {
+    if (isScrollMode &&
+        scrollController != null &&
+        scrollController.hasClients) {
       final position = scrollController.position;
       final target = (position.pixels + days * _fixedDayWidth!).clamp(
         position.minScrollExtent,

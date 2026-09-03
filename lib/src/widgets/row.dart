@@ -205,7 +205,9 @@ class _GanttActivityRowState extends State<GanttActivityRow> {
                   activity.listTitle ?? activity.title ?? '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textStyle(weight: FontWeight.w500),
+                  style: theme.textStyle(
+                    weight: theme.nameWeightForDepth?.call(activity.depth),
+                  ),
                 ),
           ),
         ],
@@ -260,176 +262,174 @@ class _GanttActivityRowState extends State<GanttActivityRow> {
     GanttTheme theme,
     Widget cell,
   ) {
-      final Widget draggableEdge = MouseRegion(
-        cursor: SystemMouseCursors.resizeRight,
-        child: Container(
-          color: Colors.white.withValues(alpha: .3),
-          width: 4,
-          height: theme.cellHeight / 1.5,
+    final Widget draggableEdge = MouseRegion(
+      cursor: SystemMouseCursors.resizeRight,
+      child: Container(
+        color: Colors.white.withValues(alpha: .3),
+        width: 4,
+        height: theme.cellHeight / 1.5,
+      ),
+    );
+
+    final cellContent = Stack(
+      fit: StackFit.expand,
+      children: [
+        cell,
+        Positioned(
+          left: 0,
+          bottom: 0,
+          child: LongPressDraggable<GanttActivity>(
+            delay: _ctrl.controller.dragStartDelay,
+            feedback: draggableEdge,
+            data: activity,
+            axis: Axis.horizontal,
+            child: draggableEdge,
+            onDragStarted: () {
+              _movementStartX = null;
+              _movementStartOffset = null;
+            },
+            onDragUpdate: (details) {
+              setState(() {
+                _movementStartX ??= details.globalPosition.dx;
+                final dxTotal = details.globalPosition.dx - _movementStartX!;
+                final daysDeltaTemp = (dxTotal / _ctrl.dayColumnWidth).round();
+                if (_ctrl.cellVisibleDays - daysDeltaTemp > 0 &&
+                    (widget.activity.validStartMove(daysDeltaTemp) ||
+                        (_ctrl.controller.allowParentIndependentDateMovement &&
+                            widget.activity.validStartMoveIgnoringChildren(
+                              daysDeltaTemp,
+                            )))) {
+                  daysDelta = daysDeltaTemp;
+                }
+                _movementStartOffset = _ctrl.dayColumnWidth * daysDelta!;
+              });
+            },
+            onDragEnd: (_) {
+              if (daysDelta != null && daysDelta != 0) {
+                _ctrl.controller.onActivityChanged(
+                  widget.activity,
+                  start: widget.activity.start.addDays(daysDelta!),
+                );
+              }
+              _movementStartX = null;
+              _movementStartOffset = null;
+            },
+          ),
         ),
-      );
-
-      final cellContent = Stack(
-        fit: StackFit.expand,
-        children: [
-          cell,
-          Positioned(
-            left: 0,
-            bottom: 0,
-            child: LongPressDraggable<GanttActivity>(
-              delay: _ctrl.controller.dragStartDelay,
-              feedback: draggableEdge,
-              data: activity,
-              axis: Axis.horizontal,
-              child: draggableEdge,
-              onDragStarted: () {
-                _movementStartX = null;
-                _movementStartOffset = null;
-              },
-              onDragUpdate: (details) {
-                setState(() {
-                  _movementStartX ??= details.globalPosition.dx;
-                  final dxTotal = details.globalPosition.dx - _movementStartX!;
-                  final daysDeltaTemp =
-                      (dxTotal / _ctrl.dayColumnWidth).round();
-                  if (_ctrl.cellVisibleDays - daysDeltaTemp > 0 &&
-                      (widget.activity.validStartMove(daysDeltaTemp) ||
-                          (_ctrl.controller.allowParentIndependentDateMovement &&
-                              widget.activity.validStartMoveIgnoringChildren(
-                                daysDeltaTemp,
-                              )))) {
-                    daysDelta = daysDeltaTemp;
-                  }
-                  _movementStartOffset = _ctrl.dayColumnWidth * daysDelta!;
-                });
-              },
-              onDragEnd: (_) {
-                if (daysDelta != null && daysDelta != 0) {
-                  _ctrl.controller.onActivityChanged(
-                    widget.activity,
-                    start: widget.activity.start.addDays(daysDelta!),
-                  );
+        Positioned(
+          right: 0,
+          top: 0,
+          child: LongPressDraggable<GanttActivity>(
+            delay: _ctrl.controller.dragStartDelay,
+            feedback: draggableEdge,
+            data: activity,
+            axis: Axis.horizontal,
+            child: draggableEdge,
+            onDragStarted: () {
+              _movementEndX = null;
+              _movementEndOffset = null;
+            },
+            onDragUpdate: (details) {
+              setState(() {
+                _movementEndX ??= details.globalPosition.dx;
+                final dxTotal = details.globalPosition.dx - _movementEndX!;
+                final daysDeltaTemp = (dxTotal / _ctrl.dayColumnWidth).round();
+                if (_ctrl.cellVisibleDays + daysDeltaTemp > 0 &&
+                    (widget.activity.validEndMove(daysDeltaTemp) ||
+                        (_ctrl.controller.allowParentIndependentDateMovement &&
+                            widget.activity.validEndMoveIgnoringChildren(
+                              daysDeltaTemp,
+                            )))) {
+                  daysDelta = daysDeltaTemp;
                 }
-                _movementStartX = null;
-                _movementStartOffset = null;
-              },
-            ),
+                _movementEndOffset = _ctrl.dayColumnWidth * daysDelta!;
+              });
+            },
+            onDragEnd: (_) {
+              if (daysDelta != null && daysDelta != 0) {
+                _ctrl.controller.onActivityChanged(
+                  widget.activity,
+                  end: widget.activity.end.addDays(daysDelta!),
+                );
+              }
+              _movementEndX = null;
+              _movementEndOffset = null;
+            },
           ),
-          Positioned(
-            right: 0,
-            top: 0,
-            child: LongPressDraggable<GanttActivity>(
-              delay: _ctrl.controller.dragStartDelay,
-              feedback: draggableEdge,
-              data: activity,
-              axis: Axis.horizontal,
-              child: draggableEdge,
-              onDragStarted: () {
-                _movementEndX = null;
-                _movementEndOffset = null;
-              },
-              onDragUpdate: (details) {
-                setState(() {
-                  _movementEndX ??= details.globalPosition.dx;
-                  final dxTotal = details.globalPosition.dx - _movementEndX!;
-                  final daysDeltaTemp =
-                      (dxTotal / _ctrl.dayColumnWidth).round();
-                  if (_ctrl.cellVisibleDays + daysDeltaTemp > 0 &&
-                      (widget.activity.validEndMove(daysDeltaTemp) ||
-                          (_ctrl.controller.allowParentIndependentDateMovement &&
-                              widget.activity.validEndMoveIgnoringChildren(
-                                daysDeltaTemp,
-                              )))) {
-                    daysDelta = daysDeltaTemp;
-                  }
-                  _movementEndOffset = _ctrl.dayColumnWidth * daysDelta!;
-                });
-              },
-              onDragEnd: (_) {
-                if (daysDelta != null && daysDelta != 0) {
-                  _ctrl.controller.onActivityChanged(
-                    widget.activity,
-                    end: widget.activity.end.addDays(daysDelta!),
-                  );
-                }
-                _movementEndX = null;
-                _movementEndOffset = null;
-              },
-            ),
-          ),
-        ],
-      );
+        ),
+      ],
+    );
 
-      final dragCell = LongPressDraggable<GanttActivity>(
-        delay: _ctrl.controller.dragStartDelay,
-        data: activity,
-        axis: Axis.horizontal,
-        feedback: Material(
-          elevation: 6,
-          color: Colors.transparent,
-          child: MultiProvider(
-            providers: [
-              ChangeNotifierProvider.value(value: _ctrl),
-              Provider.value(value: theme),
-            ],
-            builder:
-                (context, child) => Opacity(
-                  opacity: 0.85,
-                  child: SizedBox(
-                    width: ctrl.cellVisibleWidth,
-                    height: theme.cellHeight,
-                    child: cellContent,
-                  ),
+    final dragCell = LongPressDraggable<GanttActivity>(
+      delay: _ctrl.controller.dragStartDelay,
+      data: activity,
+      axis: Axis.horizontal,
+      feedback: Material(
+        elevation: 6,
+        color: Colors.transparent,
+        child: MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: _ctrl),
+            Provider.value(value: theme),
+          ],
+          builder:
+              (context, child) => Opacity(
+                opacity: 0.85,
+                child: SizedBox(
+                  width: ctrl.cellVisibleWidth,
+                  height: theme.cellHeight,
+                  child: cellContent,
                 ),
-          ),
+              ),
         ),
-        childWhenDragging: const SizedBox.shrink(),
-        onDragStarted: () {
-          _movementX = null;
-        },
-        onDragUpdate: (details) {
-          _movementX ??= details.globalPosition.dx;
-          final dxTotal = details.globalPosition.dx - _movementX!;
-          final daysDeltaTemp = (dxTotal / _ctrl.dayColumnWidth).round();
-          if (widget.activity.validMove(daysDeltaTemp) ||
-              (_ctrl.controller.allowParentIndependentDateMovement &&
-                  widget.activity.validMoveToParent(daysDeltaTemp))) {
-            daysDelta = daysDeltaTemp;
-          }
-        },
-        onDragEnd: (_) {
-          if (daysDelta != null && daysDelta != 0) {
-            _ctrl.controller.onActivityChanged(
-              widget.activity,
-              start: widget.activity.start.addDays(daysDelta!),
-              end: widget.activity.end.addDays(daysDelta!),
-            );
-          }
-          _movementX = null;
-        },
-        child: cellContent,
-      );
+      ),
+      childWhenDragging: const SizedBox.shrink(),
+      onDragStarted: () {
+        _movementX = null;
+      },
+      onDragUpdate: (details) {
+        _movementX ??= details.globalPosition.dx;
+        final dxTotal = details.globalPosition.dx - _movementX!;
+        final daysDeltaTemp = (dxTotal / _ctrl.dayColumnWidth).round();
+        if (widget.activity.validMove(daysDeltaTemp) ||
+            (_ctrl.controller.allowParentIndependentDateMovement &&
+                widget.activity.validMoveToParent(daysDeltaTemp))) {
+          daysDelta = daysDeltaTemp;
+        }
+      },
+      onDragEnd: (_) {
+        if (daysDelta != null && daysDelta != 0) {
+          _ctrl.controller.onActivityChanged(
+            widget.activity,
+            start: widget.activity.start.addDays(daysDelta!),
+            end: widget.activity.end.addDays(daysDelta!),
+          );
+        }
+        _movementX = null;
+      },
+      child: cellContent,
+    );
 
-      return Row(
-        children: [
-          SizedBox(
-            // Clamped, not the delta — dragging past the rendered edge
-            // keeps tracking the pointer (the commit on drag-end still
-            // uses the real, unclamped delta), it just can't draw past 0.
-            width: (ctrl.spaceBefore + (_movementStartOffset ?? 0)).clamp(
-              0.0,
-              double.infinity,
-            ),
-            child: Container(),
+    return Row(
+      children: [
+        SizedBox(
+          // Clamped, not the delta — dragging past the rendered edge
+          // keeps tracking the pointer (the commit on drag-end still
+          // uses the real, unclamped delta), it just can't draw past 0.
+          width: (ctrl.spaceBefore + (_movementStartOffset ?? 0)).clamp(
+            0.0,
+            double.infinity,
           ),
-          SizedBox(
-            width:
-                ctrl.cellVisibleWidth -
-                (_movementStartOffset ?? 0) +
-                (_movementEndOffset ?? 0),
-            child: _ctrl.controller.enableDraggable ? dragCell : cell,
-          ),
-        ],
-      );
+          child: Container(),
+        ),
+        SizedBox(
+          width:
+              ctrl.cellVisibleWidth -
+              (_movementStartOffset ?? 0) +
+              (_movementEndOffset ?? 0),
+          child: _ctrl.controller.enableDraggable ? dragCell : cell,
+        ),
+      ],
+    );
   }
 }

@@ -215,13 +215,10 @@ class _SelectableBarGestureState extends State<SelectableBarGesture> {
           child: IgnorePointer(
             child: Material(
               elevation: 4,
-              color: Colors.black87,
+              color: _controller.theme.dragTooltipBackgroundColor,
               borderRadius: BorderRadius.circular(6),
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -230,14 +227,15 @@ class _SelectableBarGestureState extends State<SelectableBarGesture> {
                       child: Text(
                         _formatDate(_liveStart),
                         style: _controller.theme.textStyle(
-                          color: Colors.white,
+                          color: _controller.theme.dragTooltipTextColor,
                         ),
                       ),
                     ),
                     Text(
                       '  →  ',
                       style: _controller.theme.textStyle(
-                        color: Colors.white70,
+                        color: _controller.theme.dragTooltipTextColor
+                            .withValues(alpha: 0.7),
                       ),
                     ),
                     Opacity(
@@ -245,7 +243,7 @@ class _SelectableBarGestureState extends State<SelectableBarGesture> {
                       child: Text(
                         _formatDate(_liveEnd),
                         style: _controller.theme.textStyle(
-                          color: Colors.white,
+                          color: _controller.theme.dragTooltipTextColor,
                         ),
                       ),
                     ),
@@ -288,7 +286,7 @@ class _SelectableBarGestureState extends State<SelectableBarGesture> {
             height: 14,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white,
+              color: theme.resizeHandleColor,
               border: Border.all(color: theme.defaultCellColor, width: 2),
               boxShadow: const [
                 BoxShadow(color: Colors.black26, blurRadius: 2),

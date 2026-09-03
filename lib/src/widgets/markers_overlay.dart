@@ -50,12 +50,15 @@ class MarkersOverlay extends StatelessWidget {
       isCollapsed: controller.isCollapsed,
     );
     final all = activities.plainList;
-    final headerOffset = theme.headerHeight + (showIsoWeek ? 10 : 0);
+    final headerOffset = headerOffsetFor(theme, showIsoWeek);
 
     const glyphSize = 14.0;
     final glyphs = <Widget>[];
     for (final marker in controller.markers) {
-      if (!marker.date.isDateBetween(controller.startDate, controller.endDate)) {
+      if (!marker.date.isDateBetween(
+        controller.startDate,
+        controller.endDate,
+      )) {
         continue;
       }
       final activity = all.getFromKey(marker.activityKey);

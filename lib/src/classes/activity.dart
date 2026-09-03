@@ -280,9 +280,7 @@ class GanttActivity<T> {
     tooltip: tooltip == _unset ? this.tooltip : tooltip as String?,
     iconTitle: iconTitle == _unset ? this.iconTitle : iconTitle as Widget?,
     children:
-        children == _unset
-            ? this.children
-            : children as List<GanttActivity>?,
+        children == _unset ? this.children : children as List<GanttActivity>?,
     onCellTap:
         onCellTap == _unset
             ? this.onCellTap
@@ -313,11 +311,12 @@ class GanttActivity<T> {
 
   /// Returns a copy of this activity and every descendant with [color] set
   /// throughout, so a whole Task family shares one base color without
-  /// hand-setting it node by node. The default [GanttTheme.colorResolver]
-  /// (`defaultGanttColorResolver`) uses it verbatim at this activity's own
-  /// depth and lightens it further for each deeper descendant — so the app
-  /// only has to decide *one* color per Task (e.g. at random) and the whole
-  /// family still reads as that one color fading with depth.
+  /// hand-setting it node by node. If [GanttTheme.colorResolver] is set to
+  /// `defaultGanttColorResolver`, it uses this color verbatim at this
+  /// activity's own depth and lightens it further for each deeper
+  /// descendant — so the app only has to decide *one* color per Task (e.g.
+  /// at random) and the whole family still reads as that one color fading
+  /// with depth.
   ///
   /// ```dart
   /// // App decides the color itself — e.g. randomly, one per Task:

@@ -16,6 +16,40 @@ void main() {
   runApp(const MyApp());
 }
 
+/// This app's own look — flutter_gantt's own defaults are intentionally
+/// neutral/generic, so an app that wants a specific design (ours, here)
+/// passes it explicitly instead of relying on the package to bake it in.
+/// Shared by every `GanttTheme.of(...)` call in this file so the whole demo
+/// stays visually consistent.
+GanttTheme appGanttTheme(
+  BuildContext context, {
+  Color? todayLineColor,
+  double? todayLineWidth,
+}) =>
+    GanttTheme.of(
+      context,
+      backgroundColor: const Color(0xFFFCFCFC),
+      holidayColor: const Color(0xFFFFF1E4),
+      weekendColor: const Color(0xFFF8F8F8),
+      todayBackgroundColor: const Color(0xFF0D90D9),
+      defaultCellColor: const Color(0xFF008ECB),
+      colorResolver: defaultGanttColorResolver,
+      nameWeightForDepth: ganttNameWeightForDepth,
+      // Package no longer bundles this — it's this app's own font now (see
+      // example/pubspec.yaml's fonts: section and example/assets/fonts/),
+      // so it's just the plain family name, not the
+      // packages/flutter_gantt/... form a package-bundled font would need.
+      fontFamily: 'Montserrat',
+      headerHeight: 48,
+      rowPadding: 0,
+      rowsGroupPadding: 0,
+      cellHeight: 48,
+      barVerticalPadding: 10,
+      chartBorderRadius: 8,
+      todayLineColor: todayLineColor,
+      todayLineWidth: todayLineWidth ?? 1.5,
+    );
+
 /// Main app widget
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -106,11 +140,14 @@ class _SubitemChecklistTitleState extends State<SubitemChecklistTitle> {
           child: Text(
             widget.label,
             overflow: TextOverflow.ellipsis,
-            style: theme.textStyle(
-              color: _checked ? theme.textColor.withValues(alpha: 0.5) : null,
-            ).copyWith(
-              decoration: _checked ? TextDecoration.lineThrough : null,
-            ),
+            style: theme
+                .textStyle(
+                  color:
+                      _checked ? theme.textColor.withValues(alpha: 0.5) : null,
+                )
+                .copyWith(
+                  decoration: _checked ? TextDecoration.lineThrough : null,
+                ),
           ),
         ),
       ],
@@ -132,8 +169,11 @@ class User {
 /// `GanttListColumn.cellBuilder`s, since the package itself stays generic
 /// and has no concept of status/priority/assignee. A record, not a class —
 /// no constructor to write, just a shape: `(status: ..., assignee: ...)`.
-typedef TaskMeta =
-    ({DemoTaskStatus status, DemoTaskPriority? priority, User assignee});
+typedef TaskMeta = ({
+  DemoTaskStatus status,
+  DemoTaskPriority? priority,
+  User assignee
+});
 
 enum DemoTaskStatus { notStarted, inProgress, completed, overdue }
 
@@ -146,16 +186,19 @@ final _taskColorRandom = math.Random();
 /// package's default color resolver takes it from there and lightens it
 /// per descendant depth.
 Color _randomTaskColor() => HSLColor.fromAHSL(
-  1,
-  _taskColorRandom.nextDouble() * 360,
-  0.55 + _taskColorRandom.nextDouble() * 0.15,
-  0.5 + _taskColorRandom.nextDouble() * 0.1,
-).toColor();
+      1,
+      _taskColorRandom.nextDouble() * 360,
+      0.55 + _taskColorRandom.nextDouble() * 0.15,
+      0.5 + _taskColorRandom.nextDouble() * 0.1,
+    ).toColor();
 
 Widget _statusGlyph(DemoTaskStatus status) {
   final (icon, color) = switch (status) {
     DemoTaskStatus.notStarted => (Icons.circle_outlined, Colors.grey),
-    DemoTaskStatus.inProgress => (Icons.access_time_filled, const Color(0xFF2F80ED)),
+    DemoTaskStatus.inProgress => (
+        Icons.access_time_filled,
+        const Color(0xFF2F80ED)
+      ),
     DemoTaskStatus.completed => (Icons.check, const Color(0xFF2E9E5B)),
     DemoTaskStatus.overdue => (Icons.priority_high, const Color(0xFFE0523B)),
   };
@@ -188,7 +231,9 @@ Widget _priorityCell(DemoTaskPriority? priority, GanttTheme theme) {
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
       const SizedBox(width: 6),
-      Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: theme.textStyle())),
+      Flexible(
+          child: Text(label,
+              overflow: TextOverflow.ellipsis, style: theme.textStyle())),
     ],
   );
 }
@@ -305,7 +350,6 @@ class _MyHomePageState extends State<MyHomePage> {
             start: now,
             end: now.add(const Duration(days: 5)),
             title: 'Subtask 2',
-            dependsOn: const ['task1.sub1'],
             data: const (
               status: DemoTaskStatus.inProgress,
               priority: DemoTaskPriority.medium,
@@ -381,7 +425,11 @@ class _MyHomePageState extends State<MyHomePage> {
             start: now,
             end: now.add(const Duration(days: 5)),
             title: 'Subtask 3',
-            dependsOn: const ['task1.sub1'],
+            // Was 'task1.sub1' — an activity that got commented out above,
+            // so this dependency silently never drew (DependencyArrows
+            // skips a dependsOn key it can't find, rather than erroring).
+            // Points at an activity that actually exists now.
+            dependsOn: const ['task1.sub2'],
             data: const (
               status: DemoTaskStatus.notStarted,
               priority: DemoTaskPriority.low,
@@ -543,13 +591,10 @@ class _MyHomePageState extends State<MyHomePage> {
             GanttRangeSelector(controller: controller),
             Expanded(
               child: Gantt(
-                theme: GanttTheme.of(
+                theme: appGanttTheme(
                   context,
                   todayLineColor: Colors.blue,
                   todayLineWidth: 2,
-                  // colorResolver left unset: uses the package's own default
-                  // (defaultGanttColorResolver) — a single green family,
-                  // lightened by depth.
                 ),
                 //monthToText: (context, date) => 'Month: ${date.month}', //this function overrides the default month-to-text
                 controller: controller,
@@ -558,19 +603,24 @@ class _MyHomePageState extends State<MyHomePage> {
                 //showIsoWeek: true,
                 showTreeGuides: true,
                 showGroupCapsules: true,
+                // Package defaults to longPressDrag/false (unchanged from
+                // before either option existed) — this demo opts into the
+                // click-to-select drag mode and lets a parent's own bar move
+                // independently of its children's current dates.
+                interactionMode: GanttInteractionMode.selectableDrag,
+                allowParentIndependentDateMovement: true,
                 listColumns: [
                   GanttListColumn(
                     header: 'Task Summary',
                     flex: 3,
-                    cellBuilder:
-                        (context, activity) => Text(
-                          activity.listTitle ?? activity.title ?? '',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.watch<GanttTheme>().textStyle(
+                    cellBuilder: (context, activity) => Text(
+                      activity.listTitle ?? activity.title ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.watch<GanttTheme>().textStyle(
                             weight: ganttNameWeightForDepth(activity.depth),
                           ),
-                        ),
+                    ),
                   ),
                   GanttListColumn(
                     header: 'Status',
@@ -585,11 +635,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   GanttListColumn(
                     header: 'Priority',
                     flex: 1,
-                    cellBuilder:
-                        (context, activity) => _priorityCell(
-                          (activity.data as TaskMeta?)?.priority,
-                          context.watch<GanttTheme>(),
-                        ),
+                    cellBuilder: (context, activity) => _priorityCell(
+                      (activity.data as TaskMeta?)?.priority,
+                      context.watch<GanttTheme>(),
+                    ),
                   ),
                   // GanttListColumn(
                   //   header: 'Start',
@@ -617,25 +666,26 @@ class _MyHomePageState extends State<MyHomePage> {
                       return meta == null
                           ? const SizedBox.shrink()
                           : _assigneeCell(
-                            meta.assignee,
-                            context.watch<GanttTheme>(),
-                          );
+                              meta.assignee,
+                              context.watch<GanttTheme>(),
+                            );
                     },
                   ),
                 ],
                 markers: [
-                  // GanttMarker(
-                  //   key: 'milestone1',
-                  //   date: _activities.first.start.add(const Duration(days: 5)),
-                  //   activityKey: 'task1',
-                  //   tooltip: 'Milestone: mid-project checkpoint',
-                  //   onTap: () => debugPrint('Marker tapped'),
-                  // ),
+                  GanttMarker(
+                    key: 'milestone1',
+                    date: _activities.first.start.add(const Duration(days: 5)),
+                    activityKey: 'task1',
+                    tooltip: 'Milestone: mid-project checkpoint',
+                    onTap: () => debugPrint('Marker tapped'),
+                  ),
                 ],
                 // holidaysAsync: (startDate, endDate, holidays) async {},
                 activitiesListFlex: 3,
                 gridAreaFlex: 4,
-                onColumnWidthsChanged: (ratios) => debugPrint('New ratios: $ratios'),
+                onColumnWidthsChanged: (ratios) =>
+                    debugPrint('New ratios: $ratios'),
                 onPeekChildrenTap: (activity, position) {
                   final children = activity.children ?? const [];
                   if (children.isEmpty) return;
@@ -691,15 +741,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                   value: controller,
                                 ),
                                 Provider<GanttTheme>.value(
-                                  value: GanttTheme.of(
+                                  value: appGanttTheme(
                                     context,
                                     todayLineColor: Colors.blue,
                                     todayLineWidth: 2,
                                   ),
                                 ),
                               ],
-                              child:
-                                  child.titleWidget ??
+                              child: child.titleWidget ??
                                   Text(child.listTitle ?? child.title ?? ''),
                             ),
                           ),

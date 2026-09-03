@@ -52,21 +52,17 @@ class ChildrenPeekOverlay extends StatelessWidget {
   // enough to still read as "belonging" to this bar, without sitting on
   // top of it.
   static const double _iconGap = 4.0;
-  static const Color _iconColor = Color(0xFF1E9E93);
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<GanttController>();
     final theme = context.watch<GanttTheme>();
     final hoveredKey = controller.hoveredActivityKey;
-    final activity = hoveredKey == null ? null : activities.getFromKey(hoveredKey);
+    final activity =
+        hoveredKey == null ? null : activities.getFromKey(hoveredKey);
     final qualifies =
         activity != null &&
-        // Subtask only, not the top-level Task — a Task's own bar getting
-        // this badge too was more visual noise than help, since a Task is
-        // usually wide enough already and its own children are Subtasks
-        // (which have their own bars, not hidden checklist content).
-        activity.depth == 1 &&
+        theme.peekBadgeBuilder != null &&
         (activity.children?.isNotEmpty ?? false) &&
         controller.dayColumnWidth * controller.getCellDays(activity) <
             theme.childrenPeekWidthThreshold;
@@ -81,7 +77,7 @@ class ChildrenPeekOverlay extends StatelessWidget {
     final rowGeometry = geometry[activity.key];
     if (rowGeometry == null) return const SizedBox.shrink();
 
-    final headerOffset = theme.headerHeight + (showIsoWeek ? 10 : 0);
+    final headerOffset = headerOffsetFor(theme, showIsoWeek);
     final x =
         controller.xForDate(activity.end) +
         controller.dayColumnWidth +
@@ -98,10 +94,7 @@ class ChildrenPeekOverlay extends StatelessWidget {
           // one frame where the grid's ListView is mid-remount.
           final positions = verticalScrollController.positions;
           final offset = positions.length == 1 ? positions.single.pixels : 0.0;
-          return Transform.translate(
-            offset: Offset(0, -offset),
-            child: child,
-          );
+          return Transform.translate(offset: Offset(0, -offset), child: child);
         },
         child: Stack(
           children: [
@@ -137,21 +130,13 @@ class _PeekBadge extends StatelessWidget {
             activity,
             details.globalPosition,
           ),
-      child: Container(
+      child: SizedBox(
         width: ChildrenPeekOverlay._iconSize,
         height: ChildrenPeekOverlay._iconSize,
-        decoration: BoxDecoration(
-          color: ChildrenPeekOverlay._iconColor,
-          borderRadius: BorderRadius.circular(7),
-          boxShadow: const [
-            BoxShadow(color: Colors.black26, blurRadius: 3, offset: Offset(0, 1)),
-          ],
-        ),
-        child: const Icon(
-          Icons.chat_bubble_outline_rounded,
-          size: 13,
-          color: Colors.white,
-        ),
+        // Always non-null here — the badge is only ever built when
+        // ChildrenPeekOverlay's own `qualifies` check already confirmed
+        // theme.peekBadgeBuilder isn't null.
+        child: context.watch<GanttTheme>().peekBadgeBuilder!(context, activity),
       ),
     ),
   );

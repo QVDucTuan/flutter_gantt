@@ -46,7 +46,7 @@ class DependencyArrows extends StatelessWidget {
       isCollapsed: controller.isCollapsed,
     );
     final all = activities.plainList;
-    final headerOffset = theme.headerHeight + (showIsoWeek ? 10 : 0);
+    final headerOffset = headerOffsetFor(theme, showIsoWeek);
 
     final arrows = <_ArrowSpec>[];
     for (final target in all) {
@@ -60,8 +60,7 @@ class DependencyArrows extends StatelessWidget {
         if (source == null || sourceGeometry == null) continue;
         arrows.add(
           _ArrowSpec(
-            startX:
-                controller.xForDate(source.end) + controller.dayColumnWidth,
+            startX: controller.xForDate(source.end) + controller.dayColumnWidth,
             startY: headerOffset + sourceGeometry.centerY,
             endX: controller.xForDate(target.start),
             endY: headerOffset + targetGeometry.centerY,
@@ -83,8 +82,12 @@ class DependencyArrows extends StatelessWidget {
             // doesn't hold for the one frame where the grid's ListView is
             // mid-remount (e.g. scroll mode just toggled).
             final positions = verticalScrollController.positions;
-            final offset = positions.length == 1 ? positions.single.pixels : 0.0;
-            return Transform.translate(offset: Offset(0, -offset), child: child);
+            final offset =
+                positions.length == 1 ? positions.single.pixels : 0.0;
+            return Transform.translate(
+              offset: Offset(0, -offset),
+              child: child,
+            );
           },
           child: CustomPaint(
             painter: _DependencyArrowsPainter(

@@ -1,6 +1,18 @@
 import '../classes/activity.dart';
 import '../classes/theme.dart';
 
+/// The vertical space the calendar header occupies above the day rows —
+/// [GanttTheme.headerHeight], plus [GanttTheme.weekRowHeight] when
+/// [showIsoWeek] is on. Every widget that positions itself "below the
+/// header" (`ActivitiesGrid`'s bars, `ActivitiesList`'s own header box, and
+/// every scroll-tracking overlay — capsules, tree guides, dependency
+/// arrows, markers, the children-peek badge) calls this instead of each
+/// reimplementing `theme.headerHeight + (showIsoWeek ? 10 : 0)` — a magic
+/// `10` repeated in nine places is nine places that can quietly drift apart
+/// if only one of them is ever updated.
+double headerOffsetFor(GanttTheme theme, bool showIsoWeek) =>
+    theme.headerHeight + (showIsoWeek ? theme.weekRowHeight : 0);
+
 /// The per-row top padding `ActivitiesGrid`/`ActivitiesList` apply before
 /// each activity, shared here so anything computing row positions
 /// independently of the widget tree (like dependency-arrow drawing) can't
@@ -66,10 +78,7 @@ Map<String, GanttRowGeometry> computeRowGeometry(
         previousSibling: i > 0 ? items[i - 1] : null,
         current: activity,
       );
-      result[activity.key] = GanttRowGeometry(
-        top: y,
-        height: theme.cellHeight,
-      );
+      result[activity.key] = GanttRowGeometry(top: y, height: theme.cellHeight);
       y += theme.cellHeight;
       final children = activity.children;
       if (children != null &&

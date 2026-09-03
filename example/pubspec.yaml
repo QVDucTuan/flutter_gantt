@@ -22,3 +22,25 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  fonts:
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat-Thin-w100.ttf
+          weight: 100
+        - asset: assets/fonts/Montserrat-Extra-Light-w200.ttf
+          weight: 200
+        - asset: assets/fonts/Montserrat-Light-w300.ttf
+          weight: 300
+        - asset: assets/fonts/Montserrat-Regular-w400.ttf
+          weight: 400
+        - asset: assets/fonts/Montserrat-Medium-w500.ttf
+          weight: 500
+        - asset: assets/fonts/Montserrat-Semi-Bold-w600.ttf
+          weight: 600
+        - asset: assets/fonts/Montserrat-Bold-w700.ttf
+          weight: 700
+        - asset: assets/fonts/Montserrat-Extra-Bold-w800.ttf
+          weight: 800
+        - asset: assets/fonts/Montserrat-Black-w900.ttf
+          weight: 900

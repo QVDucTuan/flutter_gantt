@@ -31,11 +31,7 @@ class _GanttCellState extends State<GanttCell> {
   Color get color {
     final activity = widget.activity;
     final theme = context.watch<GanttTheme>();
-    return theme.colorResolver?.call(
-          activity.depth,
-          activity.colorIndex,
-          activity.color,
-        ) ??
+    return theme.colorResolver?.call(activity) ??
         activity.color ??
         theme.defaultCellColor;
   }
@@ -102,10 +98,12 @@ class _GanttCellState extends State<GanttCell> {
       ),
     );
 
-    // Subtask only (depth 1), not the top-level Task — see
-    // ChildrenPeekOverlay, which applies the same restriction; matched here
-    // too so hovering a Task's bar doesn't even bother reporting it.
-    if (widget.activity.depth != 1 || widget.activity.children?.isNotEmpty != true) {
+    // Matches ChildrenPeekOverlay's own "qualifies" check — no point
+    // reporting hover here if that overlay wouldn't show anything for it
+    // anyway (no children, or the badge is disabled via a null
+    // peekBadgeBuilder).
+    if (theme.peekBadgeBuilder == null ||
+        widget.activity.children?.isNotEmpty != true) {
       return bar;
     }
 
@@ -122,7 +120,8 @@ class _GanttCellState extends State<GanttCell> {
     // reads it and draws the actual badge at an absolute canvas position.
     return MouseRegion(
       onEnter: (_) => ctrl.controller.hoverActivity(widget.activity.key),
-      onExit: (_) => ctrl.controller.scheduleUnhoverActivity(widget.activity.key),
+      onExit:
+          (_) => ctrl.controller.scheduleUnhoverActivity(widget.activity.key),
       child: bar,
     );
   }
